@@ -1,4 +1,6 @@
+img_size: 32
 in_channels: 3
 channels: [32, 64, 128, 256]
 latent_dim: 10
 beta: 0.0
+lr: 0.0001

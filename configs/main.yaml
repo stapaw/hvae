@@ -1,3 +1,12 @@
 defaults:
  - dataset: cifar10
  - model: vae
+
+training:
+  max_epochs: 5
+  lr: 0.0001
+
+wandb:
+  project: hvae
+  dir: wandb
+  log_every_n_steps: 10

@@ -1,4 +1,4 @@
-name: cifar10
+name: cifar100
 img_size: 32
 num_classes: 10
 num_channels: 3
