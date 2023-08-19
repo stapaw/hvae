@@ -24,3 +24,6 @@ include = ["hvae"]
 select = ["E", "F", "B"]
 line-length = 120
 ignore = ["B905"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"] # disable unused-import in __init__.py files
