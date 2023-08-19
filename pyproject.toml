@@ -4,3 +4,4 @@ requires=["setuptools"]
 [tool.ruff]
 select = ["E", "F", "B"]
 line-length = 120
+ignore = ["B905"]
