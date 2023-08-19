@@ -1,15 +1,15 @@
 """The β-VAE model. See https://openreview.net/forum?id=Sy2fzU9gl for details."""
 from typing import List, Optional
 
+import lightning.pytorch as pl
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from codis.models.base_vae import BaseVAE
-from codis.models.blocks import Decoder, Encoder
+from hvae.models.blocks import Decoder, Encoder
 
 
-class VAE(p.LightningModule):
+class VAE(pl.LightningModule):
     """The β-VAE model class."""
 
     def __init__(
@@ -19,6 +19,7 @@ class VAE(p.LightningModule):
         channels: Optional[list] = None,
         latent_dim: int = 10,
         beta: float = 0.0,
+        lr: float = 1e-3,
     ) -> None:
         """Initialize the model.
         Args:
@@ -27,6 +28,7 @@ class VAE(p.LightningModule):
             channels: Number of channels in the encoder and decoder networks
             latent_dim: Latent space dimensionality
             beta: Weight of the KL divergence loss term
+            lr: Learning rate
         Returns:
             None
         """
@@ -34,6 +36,7 @@ class VAE(p.LightningModule):
 
         self.latent_dim = latent_dim
         self.beta = beta
+        self.lr = lr
 
         if channels is None:
             channels = [4, 4, 8, 8, 16]
@@ -47,6 +50,41 @@ class VAE(p.LightningModule):
         self.fc_var = nn.Linear(encoder_output_dim, latent_dim)
         self.decoder_input = nn.Linear(latent_dim, encoder_output_dim)
         self.decoder = Decoder(list(reversed(channels)), in_channels)
+
+    def configure_optimizers(self):
+        """Configure the optimizers."""
+        return torch.optim.Adam(
+            [
+                {"params": self.encoder.parameters(), "lr": self.lr},
+                {"params": self.fc_mu.parameters(), "lr": self.lr},
+                {"params": self.fc_var.parameters(), "lr": self.lr},
+                {"params": self.decoder_input.parameters(), "lr": self.lr},
+                {"params": self.decoder.parameters(), "lr": self.lr},
+            ]
+        )
+
+    def configure_optimizers(self):
+        """Initialize the optimizer."""
+        return torch.optim.Adam(self.parameters(), lr=self.lr)
+
+    def training_step(self, batch, batch_idx):
+        """Perform a training step."""
+        return self._step(batch, "train")
+
+    def validation_step(self, batch, batch_idx):
+        """Perform a validation step."""
+        return self._step(batch, "val")
+
+    def test_step(self, batch, batch_idx):
+        """Perform a test step."""
+        return self._step(batch, "test")
+
+    def _step(self, batch, stage):
+        x, _ = batch
+        x_hat, mu, log_var = self.forward(x)
+        loss = self.loss_function(x, x_hat, mu, log_var)
+        self.log_dict({f"{k}_{stage}": v for k, v in loss.items()})
+        return loss["loss"]
 
     def forward(self, x: Tensor) -> List[Tensor]:
         """Perform the forward pass.
@@ -78,7 +116,7 @@ class VAE(p.LightningModule):
             mu: Mean of the latent Gaussian of shape (N x D)
             logvar: Standard deviation of the latent Gaussian of shape (N x D)
         Returns:
-            Sampled latent vector [N x D]
+            Sampled latent vector (N x D)
         """
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
@@ -115,7 +153,7 @@ class VAE(p.LightningModule):
             log_var: Latent log variance of shape (B x D)
             kld_weight: Weight for the Kullback-Leibler divergence term
         Returns:
-            Dictionary containing the loss value and the individual losses.
+            Dictionary containing the loss value and the individual losses
         """
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
