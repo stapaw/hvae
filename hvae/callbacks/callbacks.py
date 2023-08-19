@@ -11,15 +11,7 @@ class VisualizationCallback(Callback):
     def __init__(self):
         super().__init__()
 
-    def on_validation_epoch_end(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule
-    ) -> None:
-        """Visualize the exemplars and the corresponding reconstructions."""
-        samples = pl_module.sample(25)
-        images = draw_batch(samples)
-        pl_module.logger.log_image("samples", images=[images])
-
-    def on_validation_batch_end(
+    def on_train_batch_end(
         self,
         trainer: pl.Trainer,
         pl_module: pl.LightningModule,
@@ -28,7 +20,7 @@ class VisualizationCallback(Callback):
         batch_idx: int,
         dataloader_idx: int = 0,
     ):
-        """Visualize the first batch of the validation set and the corresponding reconstructions."""
+        """Visualize the first batch and reconstructions."""
         if batch_idx == 0:
             x, _ = batch
             pl_module.eval()
@@ -37,6 +29,14 @@ class VisualizationCallback(Callback):
                 x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
             )
             pl_module.logger.log_image("reconstructions", images=[images])
+
+    def on_train_epoch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ) -> None:
+        """Visualize model samples."""
+        samples = pl_module.sample(25)
+        images = draw_batch(samples)
+        pl_module.logger.log_image("samples", images=[images])
 
 
 class LoggingCallback(Callback):
