@@ -17,8 +17,9 @@ def draw_batch(
     """Show a batch of images on a grid.
     Only the first n_max images are shown.
     Args:
-        images: A numpy array of shape (N, C, H, W) or (N, H, W).
-        n_max: The maximum number of images to show.
+        images: A numpy array of shape (N, C, H, W) or (N, H, W)
+        fig_height: The height of the figure in inches
+        num_images: The number of images to show
     Returns:
         None
     """
@@ -51,9 +52,9 @@ def draw_reconstructions(
     """Show a batch of images and their reconstructions on a grid.
     Only the first n_max images are shown.
     Args:
-        image_arrays: Numpy arrays of shape (N, C, H, W) or (N, H, W).
-        fig_height: The height of the figure in inches.
-        n_max: The maximum number of images to show.
+        image_arrays: Numpy arrays of shape (N, C, H, W) or (N, H, W)
+        fig_height: The height of the figure in inches
+        num_images: The number of images to show
     Returns:
         None
     """
