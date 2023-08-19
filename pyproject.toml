@@ -10,8 +10,9 @@ authors = [
 ]
 description = "Exploring continual learning with hierarchical VAEs."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
+    "hydra-core",
     "lightning",
     "torch",
     "torchvision",
