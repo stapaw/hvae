@@ -63,10 +63,6 @@ class VAE(pl.LightningModule):
             ]
         )
 
-    def configure_optimizers(self):
-        """Initialize the optimizer."""
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
-
     def training_step(self, batch, batch_idx):
         """Perform a training step."""
         return self._step(batch, "train")
