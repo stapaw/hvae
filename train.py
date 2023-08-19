@@ -5,7 +5,7 @@ import torchvision
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
-from torch import transforms
+from torchvision import transforms
 
 from hvae.callbacks import LoggingCallback, VisualizationCallback
 from hvae.models import VAE
