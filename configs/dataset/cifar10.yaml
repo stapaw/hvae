@@ -1,0 +1,4 @@
+# @package _group_
+name: cifar10
+img_size: 32
+num_classes: 10
