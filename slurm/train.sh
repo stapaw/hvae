@@ -16,6 +16,8 @@ scontrol show job $SLURM_JOB_ID
 source $HOME/.bashrc
 source $WORK/virtualenvs/hvae/bin/activate
 
+python -m pip install --upgrade pip
+python -m pip install -r $HOME/hvae/requirements.txt
 python -m pip install -e $HOME/hvae
 
 srun --gres=gpu:1 python $HOME/hvae/train.py wandb.dir $WORK/projects/codis/wandb dataset.root $WORK/datasets
