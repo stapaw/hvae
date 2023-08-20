@@ -14,6 +14,7 @@ from hvae.models import VAE
 @hydra.main(config_path="configs", config_name="main")
 def train(cfg: DictConfig) -> None:
     """Train a model."""
+    torch.set_float32_matmul_precision("high")
     if cfg.dataset.name == "cifar10":
         dataset = torchvision.datasets.CIFAR10(
             root=cfg.dataset.root,
@@ -21,14 +22,22 @@ def train(cfg: DictConfig) -> None:
             download=True,
             transform=transforms.ToTensor(),
         )
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=cfg.dataset.batch_size,
+        train_dataset, val_dataset = torch.utils.data.random_split(
+            dataset, [0.99, 0.01]
+        )
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=cfg.training.batch_size,
         shuffle=True,
-        num_workers=cfg.dataset.num_workers,
+        num_workers=cfg.training.num_workers,
+    )
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        num_workers=cfg.training.num_workers,
     )
     wandb_logger = WandbLogger(project=cfg.wandb.project, save_dir=cfg.wandb.dir)
-    wandb_logger.experiment.config.update(cfg)
     trainer = Trainer(
         accelerator="auto",
         default_root_dir=cfg.wandb.dir,
@@ -50,7 +59,7 @@ def train(cfg: DictConfig) -> None:
             lr=cfg.training.lr,
         )
 
-    trainer.fit(model, dataloader)
+    trainer.fit(model, train_dataloader, val_dataloader)
 
 
 if __name__ == "__main__":
