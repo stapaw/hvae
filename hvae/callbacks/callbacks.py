@@ -11,7 +11,7 @@ class VisualizationCallback(Callback):
     def __init__(self):
         super().__init__()
 
-    def on_train_batch_end(
+    def on_validation_batch_end(
         self,
         trainer: pl.Trainer,
         pl_module: pl.LightningModule,
@@ -34,7 +34,7 @@ class VisualizationCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         """Visualize model samples."""
-        samples = pl_module.sample(25)
+        samples = pl_module.sample(25).detach().cpu().numpy()
         images = draw_batch(samples)
         pl_module.logger.log_image("samples", images=[images])
 
