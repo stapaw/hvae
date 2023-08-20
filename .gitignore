@@ -1,7 +1,12 @@
 # dev
 .vscode
+.ruff_cache
 venv
 
 # build
 *.egg-info
 *.pyc
+__pycache__
+
+# runs
+outputs
