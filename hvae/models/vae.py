@@ -43,6 +43,7 @@ class VAE(pl.LightningModule):
         self.channels = channels
 
         self.encoder_output_size = img_size // 2 ** len(channels)
+        assert self.encoder_output_size > 0, "Too many layers for the input size."
         encoder_output_dim = self.encoder_output_size**2 * channels[-1]
 
         self.encoder = Encoder(channels, in_channels)
@@ -165,7 +166,7 @@ class VAE(pl.LightningModule):
             "kl_divergence": kl_divergence,
         }
 
-    def sample(self, num_samples: int, current_device: int) -> Tensor:
+    def sample(self, num_samples: int) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
             num_samples: Number of samples to generate
@@ -173,8 +174,7 @@ class VAE(pl.LightningModule):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
-        z = torch.randn(num_samples, self.latent_dim)
-        z = z.to(current_device)
+        z = torch.randn(num_samples, self.latent_dim).to(self.device)
         return self.decode(z)
 
     def reconstruct(self, x: Tensor, **kwargs) -> Tensor:
