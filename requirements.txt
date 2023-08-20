@@ -2,4 +2,5 @@ hydra-core
 lightning
 torch
 torchvision
+wandb
 matplotlib
