@@ -1,10 +1,13 @@
 defaults:
+ - _self_
  - dataset: cifar10
  - model: vae
 
 training:
-  max_epochs: 5
-  lr: 0.0001
+  max_epochs: 100
+  batch_size: 1024
+  num_workers: 16
+  lr: 0.001
 
 wandb:
   project: hvae
