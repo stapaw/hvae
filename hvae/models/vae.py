@@ -221,8 +221,6 @@ class CVAE(VAE):
             Reconstructed input of shape (B x C x H x W)
         """
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        if len(y.shape) < 2:
-            y = y.unsqueeze(1)
         z = torch.cat([z, y], dim=1)
         z = self.fc_z(z)
         return super().decode(z)
