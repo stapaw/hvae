@@ -8,9 +8,6 @@ from hvae.visualization import draw_batch, draw_reconstructions
 class VisualizationCallback(Callback):
     """Callback for visualizing VAE reconstructions."""
 
-    def __init__(self):
-        super().__init__()
-
     def on_validation_batch_end(
         self,
         trainer: pl.Trainer,
@@ -22,9 +19,9 @@ class VisualizationCallback(Callback):
     ):
         """Visualize the first batch and reconstructions."""
         if batch_idx == 0:
-            x, _ = batch
+            x, y = batch
             pl_module.eval()
-            x_hat, *_ = pl_module(x.to(pl_module.device))
+            _, x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
             images = draw_reconstructions(
                 x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
             )
