@@ -236,6 +236,6 @@ class CVAE(VAE):
             Tensor of shape (num_samples x C x H x W)
         """
         if y is None:
-            y = torch.randint(self.num_classes, size=(num_samples, 1)).to(self.device)
+            y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
         z = torch.randn(num_samples, self.latent_dim).to(self.device)
         return self.decode(z, y)
