@@ -192,7 +192,7 @@ class CVAE(VAE):
     def __init__(self, num_classes: int = None, **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
-        self.fc_z = nn.Linear(num_classes, self.latent_dim)
+        self.fc_z = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
 
     def step(self, batch):
         x, y = batch
