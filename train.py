@@ -7,8 +7,8 @@ from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
 from torchvision import transforms
 
-from hvae.callbacks import LoggingCallback, VisualizationCallback
-from hvae.models import VAE
+from hvae.callbacks import LoggingCallback, MetricsCallback, VisualizationCallback
+from hvae.models import VAE, CVAE
 
 
 @hydra.main(config_path="configs", config_name="main")
@@ -47,8 +47,13 @@ def train(cfg: DictConfig) -> None:
         log_every_n_steps=cfg.wandb.log_every_n_steps,
         logger=wandb_logger,
         max_epochs=cfg.training.max_epochs,
-        callbacks=[LoggingCallback(), VisualizationCallback()],
+        callbacks=[LoggingCallback(), MetricsCallback(), VisualizationCallback()],
     )
+    model = get_model(cfg)
+    trainer.fit(model, train_dataloader, val_dataloader)
+
+
+def get_model(cfg: DictConfig):
     if cfg.model.name == "vae":
         model = VAE(
             img_size=cfg.dataset.img_size,
@@ -58,8 +63,17 @@ def train(cfg: DictConfig) -> None:
             beta=cfg.model.beta,
             lr=cfg.training.lr,
         )
-
-    trainer.fit(model, train_dataloader, val_dataloader)
+    elif cfg.model.name == "cvae":
+        model = CVAE(
+            num_classes=cfg.dataset.num_classes,
+            img_size=cfg.dataset.img_size,
+            in_channels=cfg.dataset.num_channels,
+            channels=cfg.model.channels,
+            latent_dim=cfg.model.latent_dim,
+            beta=cfg.model.beta,
+            lr=cfg.training.lr,
+        )
+    return model
 
 
 if __name__ == "__main__":
