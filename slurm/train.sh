@@ -20,4 +20,5 @@ python -m pip install --upgrade pip
 python -m pip install -r $HOME/hvae/requirements.txt
 python -m pip install -e $HOME/hvae
 
-srun --gres=gpu:1 python $HOME/hvae/train.py wandb.dir=$WORK/projects/hvae/wandb dataset.root=$WORK/datasets hydra.output_subdir=$WORK/projects/hvae/hydra
+srun --gres=gpu:1 python $HOME/hvae/train.py hydra.output_subdir=$WORK/projects/hvae/hydra wandb.dir=$WORK/projects/hvae/wandb \
+    dataset.root=$WORK/datasets model=cvae

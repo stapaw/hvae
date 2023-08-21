@@ -185,3 +185,59 @@ class VAE(pl.LightningModule):
             Reconstructed input of shape (B x C x H x W)
         """
         return self.forward(x)[0]
+
+
+class CVAE(VAE):
+    """Conditional VAE"""
+
+    def __init__(self, num_classes: int = None, **kwargs):
+        super().__init__(**kwargs)
+        self.num_classes = num_classes
+        self.fc_z = nn.Linear(num_classes, self.latent_dim)
+
+    def _step(self, batch, stage):
+        x, y = batch
+        x_hat, mu, log_var = self.forward(x, y)
+        loss = self.loss_function(x, x_hat, mu, log_var)
+        self.log_dict({f"{k}_{stage}": v for k, v in loss.items()})
+        return loss["loss"]
+
+    def forward(self, x: Tensor, y: Tensor) -> List[Tensor]:
+        """Perform the forward pass.
+        Args:
+            x: Input tensor of shape (B x C x H x W)
+        Returns:
+            List of tensors [reconstructed input, latent mean, latent log variance]
+        """
+        mu, log_var = self.encode(x)
+        z = self.reparameterize(mu, log_var)
+        x_hat = self.decode(z, y)
+        return [x_hat, mu, log_var]
+
+    def decode(self, z: Tensor, y: Tensor) -> Tensor:
+        """Pass the latent code through the decoder network and return the reconstructed input.
+        Args:
+            z: Latent code tensor of shape (B x D)
+            y: Class label tensor of shape (B x N)
+        Returns:
+            Reconstructed input of shape (B x C x H x W)
+        """
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        if len(y.shape) < 2:
+            y = y.unsqueeze(1)
+        z = torch.cat([z, y], dim=1)
+        z = self.fc_z(z)
+        return super().decode(z)
+
+    def sample(self, num_samples: int, y: Tensor = None) -> Tensor:
+        """Sample a vector in the latent space and return the corresponding image.
+        Args:
+            num_samples: Number of samples to generate
+            y: Class label tensor of shape (num_samples x 1)
+        Returns:
+            Tensor of shape (num_samples x C x H x W)
+        """
+        if y is None:
+            y = torch.randint(self.num_classes, size=(num_samples, 1)).to(self.device)
+        z = torch.randn(num_samples, self.latent_dim).to(self.device)
+        return self.decode(z, y)
