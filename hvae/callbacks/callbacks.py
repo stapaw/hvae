@@ -39,6 +39,46 @@ class VisualizationCallback(Callback):
         pl_module.logger.log_image("samples", images=[images])
 
 
+class MetricsCallback(Callback):
+    """Callback for logging metrics."""
+
+    def on_train_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        """Log the training loss."""
+        trainer.logger.log_metrics({f"train/{k}": v for k, v in outputs.items()})
+
+    def on_validation_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        """Log the validation loss."""
+        trainer.logger.log_metrics({f"val/{k}": v for k, v in outputs.items()})
+
+    def on_test_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        """Log the test loss."""
+        trainer.logger.log_metrics({f"test/{k}": v for k, v in outputs.items()})
+
+
 class LoggingCallback(Callback):
     """Callback for additional logging."""
 

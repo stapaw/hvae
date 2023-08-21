@@ -66,22 +66,21 @@ class VAE(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """Perform a training step."""
-        return self._step(batch, "train")
+        return self.step(batch)[0]
 
     def validation_step(self, batch, batch_idx):
         """Perform a validation step."""
-        return self._step(batch, "val")
+        return self.step(batch)[0]
 
     def test_step(self, batch, batch_idx):
         """Perform a test step."""
-        return self._step(batch, "test")
+        return self.step(batch)[0]
 
-    def _step(self, batch, stage):
+    def step(self, batch):
         x, _ = batch
         x_hat, mu, log_var = self.forward(x)
         loss = self.loss_function(x, x_hat, mu, log_var)
-        self.log_dict({f"{k}_{stage}": v for k, v in loss.items()})
-        return loss["loss"]
+        return loss, x_hat
 
     def forward(self, x: Tensor) -> List[Tensor]:
         """Perform the forward pass.
@@ -93,7 +92,7 @@ class VAE(pl.LightningModule):
         mu, log_var = self.encode(x)
         z = self.reparameterize(mu, log_var)
         x_hat = self.decode(z)
-        return [x_hat, mu, log_var]
+        return x_hat, mu, log_var
 
     def encode(self, x: Tensor) -> List[Tensor]:
         """Pass the input through the encoder network and return the latent code.
@@ -195,12 +194,11 @@ class CVAE(VAE):
         self.num_classes = num_classes
         self.fc_z = nn.Linear(num_classes, self.latent_dim)
 
-    def _step(self, batch, stage):
+    def step(self, batch):
         x, y = batch
         x_hat, mu, log_var = self.forward(x, y)
         loss = self.loss_function(x, x_hat, mu, log_var)
-        self.log_dict({f"{k}_{stage}": v for k, v in loss.items()})
-        return loss["loss"]
+        return loss, x_hat
 
     def forward(self, x: Tensor, y: Tensor) -> List[Tensor]:
         """Perform the forward pass.
