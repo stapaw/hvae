@@ -104,7 +104,7 @@ class VAE(pl.LightningModule):
         x = self.encoder(x).flatten(start_dim=1)
         mu = self.fc_mu(x)
         log_var = self.fc_var(x)
-        return [mu, log_var]
+        return mu, log_var
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         """Perform the reparameterization trick.
@@ -210,7 +210,7 @@ class CVAE(VAE):
         mu, log_var = self.encode(x)
         z = self.reparameterize(mu, log_var)
         x_hat = self.decode(z, y)
-        return [x_hat, mu, log_var]
+        return x_hat, mu, log_var
 
     def decode(self, z: Tensor, y: Tensor) -> Tensor:
         """Pass the latent code through the decoder network and return the reconstructed input.
