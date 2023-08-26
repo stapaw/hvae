@@ -49,7 +49,7 @@ class MetricsCallback(Callback):
         dataloader_idx: int = 0,
     ):
         """Log the training loss."""
-        trainer.logger.log_metrics({f"train/{k}": v for k, v in outputs.items()})
+        trainer.logger.log_metrics({f"train/{k}": v.item() for k, v in outputs.items()})
 
     def on_validation_batch_end(
         self,
@@ -61,7 +61,7 @@ class MetricsCallback(Callback):
         dataloader_idx: int = 0,
     ):
         """Log the validation loss."""
-        trainer.logger.log_metrics({f"val/{k}": v for k, v in outputs.items()})
+        trainer.logger.log_metrics({f"val/{k}": v.item() for k, v in outputs.items()})
 
     def on_test_batch_end(
         self,
@@ -73,7 +73,7 @@ class MetricsCallback(Callback):
         dataloader_idx: int = 0,
     ):
         """Log the test loss."""
-        trainer.logger.log_metrics({f"test/{k}": v for k, v in outputs.items()})
+        trainer.logger.log_metrics({f"test/{k}": v.item() for k, v in outputs.items()})
 
 
 class LoggingCallback(Callback):
