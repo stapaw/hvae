@@ -17,8 +17,8 @@ class VAE(pl.LightningModule):
         img_size: int = 64,
         in_channels: int = 1,
         channels: Optional[list] = None,
-        latent_dim: int = 10,
-        beta: float = 0.0,
+        latent_dim: int = 16,
+        beta: float = 1.0,
         lr: float = 1e-3,
     ) -> None:
         """Initialize the model.
@@ -39,7 +39,7 @@ class VAE(pl.LightningModule):
         self.lr = lr
 
         if channels is None:
-            channels = [4, 4, 8, 8, 16]
+            channels = [16, 32, 64, 64, 128]
         self.channels = channels
 
         self.encoder_output_size = img_size // 2 ** len(channels)
