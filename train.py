@@ -2,42 +2,25 @@
 import hydra
 import torch
 import torchvision
+import wandb
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
 from hvae.callbacks import LoggingCallback, MetricsCallback, VisualizationCallback
-from hvae.models import VAE, CVAE
+from hvae.models import CVAE, VAE
 
 
 @hydra.main(config_path="configs", config_name="main")
 def train(cfg: DictConfig) -> None:
     """Train a model."""
     torch.set_float32_matmul_precision("high")
-    if cfg.dataset.name == "cifar10":
-        dataset = torchvision.datasets.CIFAR10(
-            root=cfg.dataset.root,
-            train=True,
-            download=True,
-            transform=transforms.ToTensor(),
-        )
-        train_dataset, val_dataset = torch.utils.data.random_split(
-            dataset, [0.99, 0.01]
-        )
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=cfg.training.batch_size,
-        shuffle=True,
-        num_workers=cfg.training.num_workers,
+    train_dataloader, val_dataloader = get_dataloaders(cfg)
+    config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    wandb_logger = WandbLogger(
+        project=cfg.wandb.project, save_dir=cfg.wandb.dir, config=config
     )
-    val_dataloader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=cfg.training.batch_size,
-        shuffle=False,
-        num_workers=cfg.training.num_workers,
-    )
-    wandb_logger = WandbLogger(project=cfg.wandb.project, save_dir=cfg.wandb.dir)
     trainer = Trainer(
         accelerator="auto",
         default_root_dir=cfg.wandb.dir,
@@ -51,6 +34,33 @@ def train(cfg: DictConfig) -> None:
     )
     model = get_model(cfg)
     trainer.fit(model, train_dataloader, val_dataloader)
+
+
+def get_dataloaders(cfg: DictConfig):
+    if cfg.dataset.name != "cifar10":
+        raise ValueError(f"Invalid dataset name: {cfg.dataset.name}.")
+    dataset = torchvision.datasets.CIFAR10(
+        root=cfg.dataset.root,
+        train=True,
+        download=True,
+        transform=transforms.ToTensor(),
+    )
+    train_dataset, val_dataset = torch.utils.data.random_split(
+        dataset, [cfg.dataset.train_split, cfg.dataset.val_split]
+    )
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=True,
+        num_workers=cfg.training.num_workers,
+    )
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        num_workers=cfg.training.num_workers,
+    )
+    return train_dataloader, val_dataloader
 
 
 def get_model(cfg: DictConfig):
@@ -73,6 +83,8 @@ def get_model(cfg: DictConfig):
             beta=cfg.model.beta,
             lr=cfg.training.lr,
         )
+    else:
+        raise ValueError(f"Invalid model name: {cfg.model.name}.")
     return model
 
 
