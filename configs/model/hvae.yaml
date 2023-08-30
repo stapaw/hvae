@@ -1,3 +1,4 @@
+_target: hvae.models.HVAE
 name: hvae
 img_size: 32
 in_channels: 3
