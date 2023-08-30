@@ -1,1 +1,2 @@
-from hvae.models.vae import VAE, CVAE
+from hvae.models.vae import VAE
+from hvae.models.hvae import CVAE
