@@ -42,14 +42,14 @@ class VAE(pl.LightningModule):
             channels = [16, 32, 64, 64, 128]
         self.channels = channels
 
-        self.encoder_output_size = img_size // 2 ** len(channels)
-        assert self.encoder_output_size > 0, "Too many layers for the input size."
-        encoder_output_dim = self.encoder_output_size**2 * channels[-1]
+        self.encoder_output_img_size = img_size // 2 ** len(channels)
+        assert self.encoder_output_img_size > 0, "Too many layers for the input size."
+        self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
 
         self.encoder = Encoder(channels, in_channels)
-        self.fc_mu = nn.Linear(encoder_output_dim, latent_dim)
-        self.fc_var = nn.Linear(encoder_output_dim, latent_dim)
-        self.decoder_input = nn.Linear(latent_dim, encoder_output_dim)
+        self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
+        self.fc_var = nn.Linear(self.encoder_output_size, latent_dim)
+        self.decoder_input = nn.Linear(latent_dim, self.encoder_output_size)
         self.decoder = Decoder(list(reversed(channels)), in_channels)
 
     def configure_optimizers(self):
@@ -129,8 +129,8 @@ class VAE(pl.LightningModule):
         z = z.view(
             -1,
             self.channels[-1],
-            self.encoder_output_size,
-            self.encoder_output_size,
+            self.encoder_output_img_size,
+            self.encoder_output_img_size,
         )
         return self.decoder(z)
 
