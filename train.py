@@ -35,7 +35,7 @@ def train(cfg: DictConfig) -> None:
         callbacks=[LoggingCallback(), MetricsCallback(), VisualizationCallback()],
     )
     # model = get_model(cfg)
-    model = hydra.instantiate(cfg.model)
+    model = hydra.utils.instantiate(cfg.model)
     trainer.fit(model, train_dataloader, val_dataloader)
 
 
