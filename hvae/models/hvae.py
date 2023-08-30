@@ -48,6 +48,7 @@ class HVAE(VAE):
     def step(self, batch):
         x, y = batch
         outputs = self.forward(x, y)
+        outputs["x"] = x
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"]
 
