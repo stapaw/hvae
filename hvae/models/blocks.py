@@ -118,15 +118,12 @@ class MLP(nn.Module):
     def __init__(
         self,
         dims: list[int],
-        dropout_rate: float = 0.0,
         activation: Callable = nn.GELU,
         last_activation: Callable = nn.Identity,
     ):
         super().__init__()
         modules = [
-            nn.Sequential(
-                nn.Linear(n_in, n_out), activation(), nn.Dropout(dropout_rate)
-            )
+            nn.Sequential(nn.Linear(n_in, n_out), activation(), nn.BatchNorm1d(n_out))
             for n_in, n_out in zip(dims[:-2], dims[1:-1])
         ]
         modules.append(nn.Sequential(nn.Linear(dims[-2], dims[-1]), last_activation()))
