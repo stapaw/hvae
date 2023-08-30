@@ -36,7 +36,6 @@ def train(cfg: DictConfig) -> None:
         max_epochs=cfg.training.max_epochs,
         callbacks=[LoggingCallback(), MetricsCallback(), VisualizationCallback()],
     )
-    # model = get_model(cfg)
     model = hydra.utils.instantiate(cfg.model)
     trainer.fit(model, train_dataloader, val_dataloader)
 
@@ -73,40 +72,6 @@ def get_dataloaders(cfg: DictConfig):
         num_workers=cfg.training.num_workers,
     )
     return train_dataloader, val_dataloader
-
-
-# def get_model(cfg: DictConfig):
-#    if cfg.model.name == "vae":
-#        model = VAE(
-#            img_size=cfg.dataset.img_size,
-#            in_channels=cfg.dataset.num_channels,
-#            channels=cfg.model.channels,
-#            latent_dim=cfg.model.latent_dim,
-#            beta=cfg.model.beta,
-#            lr=cfg.training.lr,
-#        )
-#    elif cfg.model.name == "cvae":
-#        model = CVAE(
-#            num_classes=cfg.dataset.num_classes,
-#            img_size=cfg.dataset.img_size,
-#            in_channels=cfg.dataset.num_channels,
-#            channels=cfg.model.channels,
-#            latent_dim=cfg.model.latent_dim,
-#            beta=cfg.model.beta,
-#            lr=cfg.training.lr,
-#        )
-#    elif cfg.model.name == "hvae":
-#        model = HVAE(
-#            img_size=cfg.dataset.img_size,
-#            in_channels=cfg.dataset.num_channels,
-#            channels=cfg.model.channels,
-#            latent_dim=cfg.model.latent_dim,
-#            beta=cfg.model.beta,
-#            lr=cfg.training.lr,
-#        )
-#    else:
-#        raise ValueError(f"Invalid model name: {cfg.model.name}.")
-#    return model
 
 
 if __name__ == "__main__":
