@@ -14,7 +14,7 @@ class VAE(pl.LightningModule):
 
     def __init__(
         self,
-        img_size: int = 64,
+        img_size: int = 32,
         in_channels: int = 1,
         channels: Optional[list] = None,
         latent_dim: int = 16,
