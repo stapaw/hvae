@@ -57,7 +57,7 @@ class HVAE(VAE):
         Returns:
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
-        r_1 = self.encoder(x)
+        r_1 = self.encoder(x).flatten(start_dim=1)  # add an MLP between enc and r_1?
         r_2 = self.nn_r_2(r_1)
 
         delta_1 = self.nn_delta_1(r_1)
