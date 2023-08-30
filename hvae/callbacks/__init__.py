@@ -1,1 +1,5 @@
-from hvae.callbacks.callbacks import LoggingCallback, VisualizationCallback
+from hvae.callbacks.callbacks import (
+    LoggingCallback,
+    MetricsCallback,
+    VisualizationCallback,
+)

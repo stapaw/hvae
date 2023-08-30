@@ -3,3 +3,6 @@ root: data/cifar100
 img_size: 32
 num_classes: 10
 num_channels: 3
+train_split: 0.99
+val_split: 0.01
+classes: null
