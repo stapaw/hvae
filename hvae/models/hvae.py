@@ -43,6 +43,7 @@ class HVAE(VAE):
                 2 * (self.latent_dim * 2),
             ]
         )
+        self.decoder_input = nn.Linear(2 * self.latent_dim, self.encoder_output_size)
 
     def step(self, batch):
         x, y = batch
