@@ -1,4 +1,6 @@
 """Training script."""
+from pathlib import Path
+
 import hydra
 import torch
 import torchvision
@@ -40,10 +42,11 @@ def train(cfg: DictConfig) -> None:
 
 
 def get_dataloaders(cfg: DictConfig):
+    root = Path(hydra.utils.get_original_cwd()) / Path(cfg.dataset.root)
     if cfg.dataset.name != "cifar10":
         raise ValueError(f"Invalid dataset name: {cfg.dataset.name}.")
     dataset = torchvision.datasets.CIFAR10(
-        root=cfg.dataset.root,
+        root=root,
         train=True,
         download=True,
         transform=transforms.ToTensor(),
