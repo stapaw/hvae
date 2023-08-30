@@ -1,4 +1,6 @@
-"""A hierarchical VAE model."""
+"""A hierarchical deep convolutional VAE model.
+Based on https://github.com/jmtomczak/intro_dgm/blob/main/vaes/vae_hierarchical_example.ipynb
+"""
 from hvae.models import VAE
 
 import torch
