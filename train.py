@@ -2,7 +2,6 @@
 import hydra
 import torch
 import torchvision
-import wandb
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
@@ -19,7 +18,11 @@ def train(cfg: DictConfig) -> None:
     train_dataloader, val_dataloader = get_dataloaders(cfg)
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     wandb_logger = WandbLogger(
-        project=cfg.wandb.project, save_dir=cfg.wandb.dir, config=config
+        project=cfg.wandb.project,
+        save_dir=cfg.wandb.dir,
+        config=config,
+        group=cfg.wandb.group,
+        mode=cfg.wandb.mode,
     )
     trainer = Trainer(
         accelerator="auto",
@@ -45,6 +48,12 @@ def get_dataloaders(cfg: DictConfig):
         download=True,
         transform=transforms.ToTensor(),
     )
+    # filter out everything except desired class
+    if cfg.dataset.classes is not None:
+        dataset = torch.utils.data.Subset(
+            dataset,
+            [i for i, (_, label) in enumerate(dataset) if label in cfg.dataset.classes],
+        )
     train_dataset, val_dataset = torch.utils.data.random_split(
         dataset, [cfg.dataset.train_split, cfg.dataset.val_split]
     )
