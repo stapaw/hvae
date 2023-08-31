@@ -20,8 +20,8 @@ class Encoder(nn.Module):
         channels = [in_channels] + channels
         module = [
             nn.Sequential(
-                nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
-                activation(),
+                # nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
+                # activation(),
                 nn.Conv2d(
                     in_channels,
                     out_channels,
@@ -62,8 +62,8 @@ class Decoder(nn.Module):
         super().__init__()
         modules = [
             nn.Sequential(
-                nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
-                activation(),
+                # nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
+                # activation(),
                 nn.ConvTranspose2d(
                     in_channels,
                     out_channels,
