@@ -150,7 +150,7 @@ class DCTHVAE(HVAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.decoder_dct = copy.deepcopy(self.decoder)
-        self.decoder_input_dct = copy.deepcopy(self.decoder_input)
+        self.decoder_input_dct = nn.Linear(self.latent_dim, self.encoder_output_size)
 
     def step(self, batch):
         x, y = batch
