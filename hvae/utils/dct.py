@@ -10,6 +10,7 @@ def reconstruct_dct(imgs, k):
         imgs: Tensor of shape (B x C x H x W) with the input images
         k: The number of DCT coefficients to keep
     """
+    imgs = imgs.detach().cpu().numpy()
     mask = get_mask(k, imgs.shape[1:])
     return torch.stack(
         [torch.from_numpy(idctn(dctn(img) * mask).astype(float)) for img in imgs]
