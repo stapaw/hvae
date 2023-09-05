@@ -13,6 +13,8 @@
 # print info about current job
 scontrol show job $SLURM_JOB_ID
 
+additional_args="$@"
+
 source $HOME/.bashrc
 source $WORK/virtualenvs/hvae/bin/activate
 
@@ -21,4 +23,5 @@ python -m pip install -r $HOME/hvae/requirements.txt
 python -m pip install -e $HOME/hvae
 
 srun --gres=gpu:1 python $HOME/hvae/train.py hydra.output_subdir=$WORK/projects/hvae/hydra wandb.dir=$WORK/projects/hvae/wandb wandb.group=hvae \
-    dataset.root=$WORK/datasets model=hvae dataset.classes=[1] training.max_epochs=3000 model.beta=0.3 model.lr=0.004
+    dataset.root=$WORK/datasets model=hvae dataset.classes=[1] training.max_epochs=3000 model.beta=0.3 model.lr=0.004 \
+    $additional_args
