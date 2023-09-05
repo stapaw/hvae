@@ -233,7 +233,7 @@ class DCTHVAE(HVAE):
         Returns:
             Dictionary containing the loss value and the individual losses
         """
-        x_dct = reconstruct_dct(x, k=self.k)
+        x_dct = reconstruct_dct(x, k=self.k).to(self.device)
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
         reconstruction_loss_dct = (
             F.mse_loss(x_hat_dct, x_dct, reduction="sum") / x_dct.shape[0]
