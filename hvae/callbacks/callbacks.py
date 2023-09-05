@@ -9,6 +9,10 @@ from hvae.visualization import draw_batch, draw_reconstructions
 class VisualizationCallback(Callback):
     """Callback for visualizing VAE reconstructions."""
 
+    def __init__(self):
+        super().__init__()
+        self._logged_dct = False
+
     def on_validation_batch_end(
         self,
         trainer: pl.Trainer,
@@ -28,20 +32,16 @@ class VisualizationCallback(Callback):
             )
             pl_module.logger.log_image("reconstructions", images=[images])
 
-            # visualize batch and its DCT reconstructions for different k
-            x, _ = batch
-            x1 = reconstruct_dct(x, k=1)
-            x2 = reconstruct_dct(x, k=2)
-            x4 = reconstruct_dct(x, k=4)
-            x8 = reconstruct_dct(x, k=8)
-            images = draw_reconstructions(
-                x.detach().cpu().numpy(),
-                x1.detach().cpu().numpy(),
-                x2.detach().cpu().numpy(),
-                x4.detach().cpu().numpy(),
-                x8.detach().cpu().numpy(),
-            )
-            pl_module.logger.log_image("dct_reconstructions", images=[images])
+            if not self._logged_dct:
+                reconstructions = [
+                    reconstruct_dct(x, k=k).detach().cpu().numpy()
+                    for k in [32, 16, 8, 4]
+                ]
+                images = draw_reconstructions(
+                    x.detach().cpu().numpy(), *reconstructions
+                )
+                pl_module.logger.log_image("dct_reconstructions", images=[images])
+                self._logged_dct = True
 
     def on_train_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
