@@ -2,6 +2,7 @@
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import Callback
 
+from hvae.utils.dct import reconstruct_dct
 from hvae.visualization import draw_batch, draw_reconstructions
 
 
@@ -26,6 +27,21 @@ class VisualizationCallback(Callback):
                 x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
             )
             pl_module.logger.log_image("reconstructions", images=[images])
+
+            # visualize batch and its DCT reconstructions for different k
+            x, _ = batch
+            x_1 = reconstruct_dct(x, k=1)
+            x_2 = reconstruct_dct(x, k=2)
+            x_4 = reconstruct_dct(x, k=4)
+            x_8 = reconstruct_dct(x, k=8)
+            images = draw_reconstructions(
+                x.detach().cpu().numpy(),
+                x1.detach().cpu().numpy(),
+                x2.detach().cpu().numpy(),
+                x4.detach().cpu().numpy(),
+                x8.detach().cpu().numpy(),
+            )
+            pl_module.logger.log_image("dct_reconstructions", images=[images])
 
     def on_train_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
