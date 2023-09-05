@@ -26,10 +26,9 @@ class VisualizationCallback(Callback):
         if batch_idx == 0:
             x, y = batch
             pl_module.eval()
-            _, x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
-            images = draw_reconstructions(
-                x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
-            )
+            _, *x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
+            x_hat = [x.detach().cpu().numpy() for x in x_hat]
+            images = draw_reconstructions(x.detach().cpu().numpy(), *x_hat)
             pl_module.logger.log_image("reconstructions", images=[images])
 
             if not self._logged_dct:
