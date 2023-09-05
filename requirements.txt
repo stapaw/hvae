@@ -1,5 +1,6 @@
 hydra-core
 lightning
+scipy
 torch
 torchvision
 wandb
