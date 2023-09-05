@@ -30,10 +30,10 @@ class VisualizationCallback(Callback):
 
             # visualize batch and its DCT reconstructions for different k
             x, _ = batch
-            x_1 = reconstruct_dct(x, k=1)
-            x_2 = reconstruct_dct(x, k=2)
-            x_4 = reconstruct_dct(x, k=4)
-            x_8 = reconstruct_dct(x, k=8)
+            x1 = reconstruct_dct(x, k=1)
+            x2 = reconstruct_dct(x, k=2)
+            x4 = reconstruct_dct(x, k=4)
+            x8 = reconstruct_dct(x, k=8)
             images = draw_reconstructions(
                 x.detach().cpu().numpy(),
                 x1.detach().cpu().numpy(),
