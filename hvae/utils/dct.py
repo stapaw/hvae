@@ -13,7 +13,7 @@ def reconstruct_dct(imgs, k):
     imgs = imgs.detach().cpu().numpy()
     mask = get_mask(k, imgs.shape[1:])
     return torch.stack(
-        [torch.from_numpy(idctn(dctn(img) * mask).astype(float)) for img in imgs]
+        [torch.from_numpy(idctn(dctn(img) * mask).astype(np.float32)) for img in imgs]
     )
 
 
