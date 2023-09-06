@@ -1,7 +1,6 @@
 """A hierarchical deep convolutional VAE model.
 Based on https://github.com/jmtomczak/intro_dgm/blob/main/vaes/vae_hierarchical_example.ipynb
 """
-import copy
 
 import torch
 from torch import Tensor, nn
@@ -149,7 +148,6 @@ class HVAE(VAE):
 class DCTHVAE(HVAE):
     def __init__(self, k: int = 16, **kwargs):
         super().__init__(**kwargs)
-        self.decoder_dct = copy.deepcopy(self.decoder)
         self.decoder_input_dct = nn.Linear(self.latent_dim, self.encoder_output_size)
         self.k = k
 
@@ -178,12 +176,13 @@ class DCTHVAE(HVAE):
         delta_mu_2, delta_log_var_2 = torch.chunk(delta_2, 2, dim=1)
         delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
         z_2 = self.reparameterize(delta_mu_2, delta_log_var_2)
-        x_hat_dct = self.decode_dct(z_2)
+        z_2 = self.decoder_input_dct(z_2)
+        x_hat_dct = self.decode(z_2)
 
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
-
+        z_1 = self.decoder_input(z_1)
         x_hat = self.decode(z_1)
 
         return {
@@ -196,14 +195,13 @@ class DCTHVAE(HVAE):
             "delta_log_var_2": delta_log_var_2,
         }
 
-    def decode_dct(self, z_2: Tensor) -> Tensor:
+    def decode(self, z: Tensor) -> Tensor:
         """Given a latent vector z, return the corresponding image.
         Args:
             z: Latent vector of shape (B x D)
         Returns:
             Tensor of shape (B x C x H x W)
         """
-        z = self.decoder_input_dct(z_2)
         z = z.view(
             -1,
             self.channels[-1],
