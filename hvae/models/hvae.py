@@ -111,18 +111,18 @@ class HVAE(VAE):
         """
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
-        kl_divergence_z1 = 0.5 * (
+        kl_divergence_z_1 = 0.5 * (
             delta_mu_1**2 / torch.exp(log_var_1)
             + torch.exp(delta_log_var_1)
             - delta_log_var_1
             - 1
         ).sum(-1)
 
-        kl_divergence_z2 = 0.5 * (
+        kl_divergence_z_2 = 0.5 * (
             delta_mu_2**2 + torch.exp(delta_log_var_2) - delta_log_var_2 - 1
         ).sum(-1)
 
-        kl_divergence = kl_divergence_z1.mean() + kl_divergence_z2.mean()
+        kl_divergence = kl_divergence_z_1.mean() + kl_divergence_z_2.mean()
 
         loss = reconstruction_loss + self.beta * kl_divergence
 
@@ -169,7 +169,7 @@ class DCTHVAE(HVAE):
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
         outputs = super().forward(x, y)
-        z_2 = self.decoder_input_dct(outputs["z2"])
+        z_2 = self.decoder_input_dct(outputs["z_2"])
         x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
         return outputs
