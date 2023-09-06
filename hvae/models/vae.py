@@ -91,6 +91,7 @@ class VAE(pl.LightningModule):
         """
         mu, log_var = self.encode(x)
         z = self.reparameterize(mu, log_var)
+        z = self.decoder_input(z)
         x_hat = self.decode(z)
         return x_hat, mu, log_var
 
@@ -125,7 +126,6 @@ class VAE(pl.LightningModule):
         Returns:
             Reconstructed input of shape (B x C x H x W)
         """
-        z = self.decoder_input(z)
         z = z.view(
             -1,
             self.channels[-1],
