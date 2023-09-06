@@ -9,7 +9,6 @@ hydra:
 trainer:
   _target_: lightning.pytorch.Trainer
   accelerator: auto
-  default_root: outputs/lightning
   devices: 1
   enable_checkpointing: false
   enable_progress_bar: false
