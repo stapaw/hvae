@@ -208,7 +208,7 @@ class DCTHVAE(HVAE):
             self.encoder_output_img_size,
             self.encoder_output_img_size,
         )
-        return self.decoder_dct(z)
+        return self.decoder(z)
 
     def loss_function(
         self,
