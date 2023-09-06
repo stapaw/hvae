@@ -24,7 +24,6 @@ python -m pip install -e $HOME/hvae
 
 srun --gres=gpu:1 python $HOME/hvae/train.py \
     hydra.output_subdir=$WORK/projects/hvae/hydra \
-    trainer.default_root=$WORK/projects/hvae/lightning \
     wandb.save_dir=$WORK/projects/hvae/wandb \
     dataset.root=$WORK/datasets \
     model=dct_hvae dataset.classes=[1] model.beta=0.3 model.lr=0.004 \
