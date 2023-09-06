@@ -85,7 +85,6 @@ class HVAE(VAE):
             "log_var_1": log_var_1,
             "delta_mu_2": delta_mu_2,
             "delta_log_var_2": delta_log_var_2,
-            "z_1": z_1,
             "z_2": z_2,
         }
 
@@ -98,6 +97,7 @@ class HVAE(VAE):
         log_var_1: Tensor,
         delta_mu_2: Tensor,
         delta_log_var_2: Tensor,
+        **kwargs,
     ) -> dict:
         """Compute the loss given ground truth images and their reconstructions.
         Args:
