@@ -4,8 +4,6 @@ from pathlib import Path
 import hydra
 import torch
 import torchvision
-from lightning.pytorch import Trainer
-from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
@@ -18,23 +16,10 @@ def train(cfg: DictConfig) -> None:
     torch.set_float32_matmul_precision("high")
     train_dataloader, val_dataloader = get_dataloaders(cfg)
     config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    wandb_logger = WandbLogger(
-        project=cfg.wandb.project,
-        save_dir=cfg.wandb.dir,
-        config=config,
-        group=cfg.wandb.group,
-        mode=cfg.wandb.mode,
-    )
-    trainer = Trainer(
-        accelerator="auto",
-        default_root_dir=cfg.wandb.dir,
-        devices=1,
-        enable_checkpointing=False,
-        enable_progress_bar=False,
-        log_every_n_steps=cfg.wandb.log_every_n_steps,
-        logger=wandb_logger,
-        max_epochs=cfg.training.max_epochs,
+    trainer = hydra.utils.instantiate(
+        cfg.trainer,
         callbacks=[LoggingCallback(), MetricsCallback(), VisualizationCallback()],
+        logger={"config": config},
     )
     model = hydra.utils.instantiate(cfg.model)
     trainer.fit(model, train_dataloader, val_dataloader)
