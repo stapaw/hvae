@@ -176,14 +176,16 @@ class DCTHVAE(HVAE):
         delta_mu_2, delta_log_var_2 = torch.chunk(delta_2, 2, dim=1)
         delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
         z_2 = self.reparameterize(delta_mu_2, delta_log_var_2)
-        z_2 = self.decoder_input_dct(z_2)
-        x_hat_dct = self.decode(z_2)
 
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
+
         z_1 = self.decoder_input(z_1)
         x_hat = self.decode(z_1)
+
+        z_2 = self.decoder_input_dct(z_2)
+        x_hat_dct = self.decode(z_2)
 
         return {
             "x_hat": x_hat,
