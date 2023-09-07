@@ -1,4 +1,4 @@
-_target_: hvae.models.DCTHVAE
+_target_: hvae.models.hvae.DCTHVAE
 k: 8
 img_size: 32
 in_channels: 3
