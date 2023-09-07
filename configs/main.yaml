@@ -27,3 +27,4 @@ wandb:
   save_dir: outputs/wandb
   group: null
   mode: online
+  notes: null
