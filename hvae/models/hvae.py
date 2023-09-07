@@ -69,11 +69,11 @@ class HVAE(VAE):
 
         delta_1 = self.nn_delta_1(r_1)
         delta_mu_1, delta_log_var_1 = torch.chunk(delta_1, 2, dim=1)
-        # delta_log_var_1 = F.hardtanh(delta_log_var_1, -7.0, 2.0)
+        delta_log_var_1 = F.hardtanh(delta_log_var_1, -7.0, 2.0)
 
         delta_2 = self.nn_delta_2(r_2)
         delta_mu_2, delta_log_var_2 = torch.chunk(delta_2, 2, dim=1)
-        # delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
+        delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
         z_2 = self.reparameterize(delta_mu_2, delta_log_var_2)
 
         h_1 = self.nn_z_1(z_2)
