@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from hvae.models.blocks import Decoder, Encoder
+from hvae.models.blocks import Decoder, Encoder, ResDecoder, ResEncoder
 
 
 class VAE(pl.LightningModule):
@@ -20,6 +20,7 @@ class VAE(pl.LightningModule):
         latent_dim: int = 16,
         beta: float = 1.0,
         lr: float = 1e-3,
+        residual: bool = False,
     ) -> None:
         """Initialize the model.
         Args:
@@ -46,11 +47,16 @@ class VAE(pl.LightningModule):
         assert self.encoder_output_img_size > 0, "Too many layers for the input size."
         self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
 
-        self.encoder = Encoder(channels, in_channels)
+        if residual:
+            self.encoder = ResEncoder()
+            self.decoder = ResDecoder()
+        else:
+            self.encoder = Encoder(channels, in_channels)
+            self.decoder = Decoder(list(reversed(channels)), in_channels)
+
         self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
         self.fc_var = nn.Linear(self.encoder_output_size, latent_dim)
         self.decoder_input = nn.Linear(latent_dim, self.encoder_output_size)
-        self.decoder = Decoder(list(reversed(channels)), in_channels)
 
     def configure_optimizers(self):
         """Configure the optimizers."""
