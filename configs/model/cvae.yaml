@@ -1,5 +1,4 @@
 _target_: hvae.models.CVAE
-name: cvae
 img_size: 32
 in_channels: 3
 channels: [16, 32, 64, 64, 128]

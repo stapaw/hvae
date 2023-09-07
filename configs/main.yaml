@@ -25,6 +25,6 @@ wandb:
   _target_: lightning.pytorch.loggers.WandbLogger
   project: hvae
   save_dir: outputs/wandb
-  group: ${model.name}
   mode: online
+  group: null
   notes: null
