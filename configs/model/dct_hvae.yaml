@@ -6,3 +6,4 @@ channels: [32, 64, 64, 128, 256]
 latent_dim: 16
 beta: 0.6
 lr: 0.004
+residual: false
