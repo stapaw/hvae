@@ -1,17 +1,30 @@
 defaults:
  - _self_
  - dataset: cifar10
- - model: vae
+ - model: dct_hvae
+
+hydra:
+  output_subdir: outputs/hydra
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  accelerator: auto
+  devices: 1
+  enable_checkpointing: false
+  enable_progress_bar: false
+  log_every_n_steps: 10
+  logger: ${wandb}
+  max_epochs: 3000
 
 training:
-  max_epochs: 100
   batch_size: 256
-  num_workers: 16
+  num_workers: 8
   lr: 0.001
 
 wandb:
+  _target_: lightning.pytorch.loggers.WandbLogger
   project: hvae
-  dir: wandb
-  group: null
+  save_dir: outputs/wandb
   mode: online
-  log_every_n_steps: 10
+  group: null
+  notes: null

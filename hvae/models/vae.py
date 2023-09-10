@@ -1,12 +1,12 @@
 """The β-VAE model. See https://openreview.net/forum?id=Sy2fzU9gl for details."""
-from typing import List, Optional
+from typing import Optional
 
 import lightning.pytorch as pl
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from hvae.models.blocks import Decoder, Encoder
+from hvae.models.blocks import Decoder, Encoder, ResDecoder, ResEncoder
 
 
 class VAE(pl.LightningModule):
@@ -20,6 +20,7 @@ class VAE(pl.LightningModule):
         latent_dim: int = 16,
         beta: float = 1.0,
         lr: float = 1e-3,
+        residual: bool = False,
     ) -> None:
         """Initialize the model.
         Args:
@@ -42,15 +43,20 @@ class VAE(pl.LightningModule):
             channels = [16, 32, 64, 64, 128]
         self.channels = channels
 
-        self.encoder_output_size = img_size // 2 ** len(channels)
-        assert self.encoder_output_size > 0, "Too many layers for the input size."
-        encoder_output_dim = self.encoder_output_size**2 * channels[-1]
+        self.encoder_output_img_size = img_size // 2 ** len(channels)
+        assert self.encoder_output_img_size > 0, "Too many layers for the input size."
+        self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
 
-        self.encoder = Encoder(channels, in_channels)
-        self.fc_mu = nn.Linear(encoder_output_dim, latent_dim)
-        self.fc_var = nn.Linear(encoder_output_dim, latent_dim)
-        self.decoder_input = nn.Linear(latent_dim, encoder_output_dim)
-        self.decoder = Decoder(list(reversed(channels)), in_channels)
+        if residual:
+            self.encoder = ResEncoder()
+            self.decoder = ResDecoder()
+        else:
+            self.encoder = Encoder(channels, in_channels)
+            self.decoder = Decoder(list(reversed(channels)), in_channels)
+
+        self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
+        self.fc_var = nn.Linear(self.encoder_output_size, latent_dim)
+        self.decoder_input = nn.Linear(latent_dim, self.encoder_output_size)
 
     def configure_optimizers(self):
         """Configure the optimizers."""
@@ -82,7 +88,7 @@ class VAE(pl.LightningModule):
         loss = self.loss_function(x, x_hat, mu, log_var)
         return loss, x_hat
 
-    def forward(self, x: Tensor) -> List[Tensor]:
+    def forward(self, x: Tensor) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
@@ -91,10 +97,11 @@ class VAE(pl.LightningModule):
         """
         mu, log_var = self.encode(x)
         z = self.reparameterize(mu, log_var)
+        z = self.decoder_input(z)
         x_hat = self.decode(z)
         return x_hat, mu, log_var
 
-    def encode(self, x: Tensor) -> List[Tensor]:
+    def encode(self, x: Tensor) -> list[Tensor]:
         """Pass the input through the encoder network and return the latent code.
         Args:
             x: Input tensor of shape (B x C x H x W)
@@ -106,15 +113,15 @@ class VAE(pl.LightningModule):
         log_var = self.fc_var(x)
         return mu, log_var
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+    def reparameterize(self, mu: Tensor, log_var: Tensor) -> Tensor:
         """Perform the reparameterization trick.
         Args:
             mu: Mean of the latent Gaussian of shape (N x D)
-            logvar: Standard deviation of the latent Gaussian of shape (N x D)
+            log_var: Standard deviation of the latent Gaussian of shape (N x D)
         Returns:
             Sampled latent vector (N x D)
         """
-        std = torch.exp(0.5 * logvar)
+        std = torch.exp(0.5 * log_var)
         eps = torch.randn_like(std)
         return mu + eps * std
 
@@ -125,12 +132,11 @@ class VAE(pl.LightningModule):
         Returns:
             Reconstructed input of shape (B x C x H x W)
         """
-        z = self.decoder_input(z)
         z = z.view(
             -1,
             self.channels[-1],
-            self.encoder_output_size,
-            self.encoder_output_size,
+            self.encoder_output_img_size,
+            self.encoder_output_img_size,
         )
         return self.decoder(z)
 
@@ -184,56 +190,3 @@ class VAE(pl.LightningModule):
             Reconstructed input of shape (B x C x H x W)
         """
         return self.forward(x)[0]
-
-
-class CVAE(VAE):
-    """Conditional VAE"""
-
-    def __init__(self, num_classes: int = None, **kwargs):
-        super().__init__(**kwargs)
-        self.num_classes = num_classes
-        self.fc_z = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
-
-    def step(self, batch):
-        x, y = batch
-        x_hat, mu, log_var = self.forward(x, y)
-        loss = self.loss_function(x, x_hat, mu, log_var)
-        return loss, x_hat
-
-    def forward(self, x: Tensor, y: Tensor) -> List[Tensor]:
-        """Perform the forward pass.
-        Args:
-            x: Input tensor of shape (B x C x H x W)
-        Returns:
-            List of tensors [reconstructed input, latent mean, latent log variance]
-        """
-        mu, log_var = self.encode(x)
-        z = self.reparameterize(mu, log_var)
-        x_hat = self.decode(z, y)
-        return x_hat, mu, log_var
-
-    def decode(self, z: Tensor, y: Tensor) -> Tensor:
-        """Pass the latent code through the decoder network and return the reconstructed input.
-        Args:
-            z: Latent code tensor of shape (B x D)
-            y: Class label tensor of shape (B x N)
-        Returns:
-            Reconstructed input of shape (B x C x H x W)
-        """
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        z = torch.cat([z, y], dim=1)
-        z = self.fc_z(z)
-        return super().decode(z)
-
-    def sample(self, num_samples: int, y: Tensor = None) -> Tensor:
-        """Sample a vector in the latent space and return the corresponding image.
-        Args:
-            num_samples: Number of samples to generate
-            y: Class label tensor of shape (num_samples x 1)
-        Returns:
-            Tensor of shape (num_samples x C x H x W)
-        """
-        if y is None:
-            y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
-        z = torch.randn(num_samples, self.latent_dim).to(self.device)
-        return self.decode(z, y)
