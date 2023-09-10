@@ -198,3 +198,23 @@ class DCTHVAE(HVAE):
         loss["reconstruction_loss_dct"] = reconstruction_loss_dct
         loss["loss"] += reconstruction_loss_dct
         return loss
+
+    def sample(self, num_samples: int, level=0) -> Tensor:
+        """Sample a vector in the latent space and return the corresponding image.
+        Args:
+            num_samples: Number of samples to generate
+            current_device: Device to run the model
+        Returns:
+            Tensor of shape (num_samples x C x H x W)
+        """
+        z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
+        if level == 1:
+            z_2 = self.decoder_input_dct(z_2)
+            return self.decode(z_2)
+        elif level == 0:
+            h_1 = self.nn_z_1(z_2)
+            mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
+            z_1 = self.reparameterize(mu_1, log_var_1)
+            z_1 = self.decoder_input(z_1)
+            return self.decode(z_1)
+        raise ValueError(f"Invalid level: {level}.")
