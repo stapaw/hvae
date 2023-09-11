@@ -193,7 +193,7 @@ class ResDecoder(nn.Module):
     """
 
     def __init__(self):
-        super(Decoder, self).__init__()
+        super(ResDecoder, self).__init__()
         self.rb1 = ResBlock(64, 48, 2, 2, 0, "decode")  # 48 4 4
         self.rb2 = ResBlock(48, 48, 2, 2, 0, "decode")  # 48 8 8
         self.rb3 = ResBlock(48, 32, 3, 1, 1, "decode")  # 32 8 8
