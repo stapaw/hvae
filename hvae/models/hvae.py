@@ -21,12 +21,10 @@ class HVAE(VAE):
                 self.encoder_output_size,
                 self.encoder_output_size,
                 self.encoder_output_size,
-                self.encoder_output_size,
             ]
         )
         self.nn_delta_1 = MLP(
             dims=[
-                self.encoder_output_size,
                 self.encoder_output_size,
                 self.encoder_output_size,
                 2 * (self.latent_dim * 2),
@@ -36,7 +34,6 @@ class HVAE(VAE):
             dims=[
                 self.encoder_output_size,
                 self.encoder_output_size,
-                self.encoder_output_size,
                 2 * self.latent_dim,
             ]
         )
@@ -44,20 +41,19 @@ class HVAE(VAE):
             dims=[
                 self.latent_dim,
                 self.encoder_output_size,
-                self.encoder_output_size,
                 2 * (self.latent_dim * 2),
             ]
         )
         self.decoder_input = nn.Linear(2 * self.latent_dim, self.encoder_output_size)
 
     def step(self, batch):
-        x, y = batch
-        outputs = self.forward(x, y)
+        x, _ = batch
+        outputs = self.forward(x)
         outputs["x"] = x
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"]
 
-    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
+    def forward(self, x: Tensor) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
@@ -153,26 +149,27 @@ class HVAE(VAE):
 
 
 class DCTHVAE(HVAE):
-    def __init__(self, k: int = 16, **kwargs):
+    def __init__(self, k: int = 16, gamma=0.5, **kwargs):
         super().__init__(**kwargs)
         self.decoder_input_dct = nn.Linear(self.latent_dim, self.encoder_output_size)
         self.k = k
+        self.gamma = gamma
 
     def step(self, batch):
-        x, y = batch
-        outputs = self.forward(x, y)
+        x, _ = batch
+        outputs = self.forward(x)
         outputs["x"] = x
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"], outputs["x_hat_dct"]
 
-    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
+    def forward(self, x: Tensor) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
         Returns:
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
-        outputs = super().forward(x, y)
+        outputs = super().forward(x)
         z_2 = self.decoder_input_dct(outputs["z_2"])
         x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
@@ -196,7 +193,7 @@ class DCTHVAE(HVAE):
             F.mse_loss(x_hat_dct, x_dct, reduction="sum") / x_dct.shape[0]
         )
         loss["reconstruction_loss_dct"] = reconstruction_loss_dct
-        loss["loss"] += reconstruction_loss_dct
+        loss["loss"] += (self.gamma - 1) * loss["reconstruction_loss"] + (1-self.gamma) * reconstruction_loss_dct
         return loss
 
     def sample(self, num_samples: int, level=0) -> Tensor:
