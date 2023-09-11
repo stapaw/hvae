@@ -196,6 +196,7 @@ class DCTHVAE(HVAE):
         loss["loss"] += (self.gamma - 1) * loss["reconstruction_loss"] + (1-self.gamma) * reconstruction_loss_dct
         return loss
 
+    @torch.no_grad()
     def sample(self, num_samples: int, level=0) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
