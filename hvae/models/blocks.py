@@ -165,7 +165,7 @@ class ResEncoder(nn.Module):
     """
 
     def __init__(self):
-        super(Encoder, self).__init__()
+        super(ResEncoder, self).__init__()
         self.init_conv = nn.Conv2d(3, 16, 3, 1, 1)  # 16 32 32
         self.BN = nn.BatchNorm2d(16)
         self.rb1 = ResBlock(16, 16, 3, 2, 1, "encode")  # 16 16 16
