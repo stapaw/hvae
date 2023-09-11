@@ -7,6 +7,7 @@ import torchvision
 from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
+from torchinfo import summary
 from hvae.callbacks import LoggingCallback, MetricsCallback, VisualizationCallback
 
 
@@ -22,6 +23,9 @@ def train(cfg: DictConfig) -> None:
         logger={"config": config},
     )
     model = hydra.utils.instantiate(cfg.model)
+
+
+    summary(model, input_size=(cfg.training.batch_size, cfg.dataset.num_channels, cfg.dataset.img_size, cfg.dataset.img_size))
     trainer.fit(model, train_dataloader, val_dataloader)
 
 
