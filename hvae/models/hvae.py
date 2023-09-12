@@ -28,7 +28,7 @@ class HVAE(VAE):
             dims=[
                 self.encoder_output_size,
                 self.encoder_output_size,
-                2 * (self.latent_dim * 2),
+                2 * (self.latent_dim),
             ]
         )
         self.nn_delta_2 = MLP(
@@ -42,7 +42,7 @@ class HVAE(VAE):
             dims=[
                 self.latent_dim,
                 self.encoder_output_size,
-                2 * (self.latent_dim * 2),
+                2 * (self.latent_dim),
             ]
         )
         self.decoder_input = nn.Linear(2 * self.latent_dim, self.encoder_output_size)
@@ -138,7 +138,7 @@ class HVAE(VAE):
             "kl_divergence": kl_divergence,
         }
 
-    def sample(self, num_samples: int) -> Tensor:
+    def sample(self, num_samples: int, y: Tensor) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
             num_samples: Number of samples to generate
@@ -146,12 +146,17 @@ class HVAE(VAE):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
+        if y is None:
+            y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
+        else:
+            assert y.shape[0] == num_samples
+
         z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1, log_var_1)
         z_1 = self.decoder_input(z_1)
-        return self.decode(z_1)
+        return self.decode(z_1, y)
 
 
 class DCTHVAE(HVAE):
