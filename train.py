@@ -36,7 +36,7 @@ def print_summary(cfg, model):
         cfg.dataset.img_size,
     ).to(model.device)
 
-    y = torch.zeros(cfg.training.batch_size, dtype=torch.long).int().to(model.device)
+    y = torch.zeros(cfg.training.batch_size, dtype=torch.long).long().to(model.device)
 
     summary(model, input_data=(x, y))
 
