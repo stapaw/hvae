@@ -43,16 +43,19 @@ class VAE(pl.LightningModule):
             channels = [16, 32, 64, 64, 128]
         self.channels = channels
 
-        self.encoder_output_img_size = img_size // 2 ** len(channels)
-        assert self.encoder_output_img_size > 0, "Too many layers for the input size."
-        self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
 
         if residual:
             self.encoder = ResEncoder()
             self.decoder = ResDecoder()
+            self.encoder_output_img_size = 2
+            self.encoder_output_size = self.encoder_output_img_size**2*64
+            self.channels = [16, 16, 32, 32, 48, 48, 64]
         else:
             self.encoder = Encoder(channels, in_channels)
             self.decoder = Decoder(list(reversed(channels)), in_channels)
+            self.encoder_output_img_size = img_size // 2 ** len(channels)
+            assert self.encoder_output_img_size > 0, "Too many layers for the input size."
+            self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
 
         self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
         self.fc_var = nn.Linear(self.encoder_output_size, latent_dim)

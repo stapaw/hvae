@@ -1,7 +1,9 @@
+black
 hydra-core
 lightning
 scipy
 torch
+torchinfo
 torchvision
 wandb
 matplotlib
