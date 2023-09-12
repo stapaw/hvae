@@ -46,7 +46,8 @@ class HVAE(VAE):
             ]
         )
         self.decoder_input = nn.Linear(self.latent_dim, self.encoder_output_size)
-        self.fc_z = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
+        self.fc_z_2 = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
+        self.fc_z_1 = nn.Linear(self.latent_dim + self.num_classes, self.latent_dim)
 
     def step(self, batch):
         x, y = batch
@@ -62,6 +63,8 @@ class HVAE(VAE):
         Returns:
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+
         r_1 = self.encoder(x).flatten(start_dim=1)  # add an MLP between enc and r_1?
         r_2 = self.nn_r_2(r_1)
 
@@ -73,16 +76,17 @@ class HVAE(VAE):
         delta_mu_2, delta_log_var_2 = torch.chunk(delta_2, 2, dim=1)
         delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
         z_2 = self.reparameterize(delta_mu_2, delta_log_var_2)
+        z_2 = torch.cat([z_2, y], dim=1)
+        z_2 = self.fc_z_2(z_2)
 
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
 
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z_1 = torch.cat([z_1, y], dim=1)
-        z_1 = self.fc_z(z_1)
+        z_1 = self.fc_z_1(z_1)
         z_1 = self.decoder_input(z_1)
-        x_hat = self.decode(z_1, y)
+        x_hat = self.decode(z_1)
 
         return {
             "x_hat": x_hat,
@@ -152,22 +156,26 @@ class HVAE(VAE):
             assert y.shape[0] == num_samples
 
         z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
+        z_2 = torch.cat([z_2, y], dim=1)
+        z_2 = self.fc_z_2(z_2)
+
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1, log_var_1)
+        z_1 = torch.cat([z_1, y], dim=1)
+        z_1 = self.fc_z_1(z_1)
         z_1 = self.decoder_input(z_1)
-        return self.decode(z_1, y)
+        return self.decode(z_1)
 
 
 class DCTHVAE(HVAE):
     """Conditional hierarchical VAE with DCT reconstruction."""
 
-    def __init__(self, k: int = 16, gamma=0.5, **kwargs):
+    def __init__(self, gamma=0.5, k: int = 16, **kwargs):
         super().__init__(**kwargs)
-        self.decoder_input_dct = nn.Linear(self.latent_dim, self.encoder_output_size)
-        self.fc_z_dct = nn.Linear(self.latent_dim + self.num_classes, self.latent_dim)
-        self.k = k
+        self.decoder_input_z_2 = nn.Linear(self.latent_dim, self.encoder_output_size)
         self.gamma = gamma
+        self.k = k
 
     def step(self, batch):
         x, y = batch
@@ -184,12 +192,8 @@ class DCTHVAE(HVAE):
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
         outputs = super().forward(x, y)
-
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        z_2 = torch.cat([outputs["z_2"], y], dim=1)
-        z_2 = self.fc_z_dct(z_2)
-        z_2 = self.decoder_input_dct(z_2)
-        x_hat_dct = self.decode(z_2, y)
+        z_2 = self.decoder_input_z_2(outputs["z_2"])
+        x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
         return outputs
 
@@ -233,12 +237,17 @@ class DCTHVAE(HVAE):
         assert level in {0, 1}, f"Invalid level: {level}."
 
         z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
+        z_2 = torch.cat([z_2, y], dim=1)
+        z_2 = self.fc_z_2(z_2)
+
         if level == 1:
-            z_2 = self.decoder_input_dct(z_2)
-            return self.decode(z_2, y)
+            z_2 = self.decoder_input_z_2(z_2)
+            return self.decode(z_2)
         if level == 0:
             h_1 = self.nn_z_1(z_2)
             mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
             z_1 = self.reparameterize(mu_1, log_var_1)
+            z_1 = torch.cat([z_1, y], dim=1)
+            z_1 = self.fc_z_1(z_1)
             z_1 = self.decoder_input(z_1)
-            return self.decode(z_1, y)
+            return self.decode(z_1)
