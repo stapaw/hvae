@@ -29,18 +29,16 @@ def train(cfg: DictConfig) -> None:
 
 def print_summary(cfg, model):
     """Print a summary of the model."""
-    summary(
-        model,
-        input_data=(
-            torch.zeros(
-                cfg.training.batch_size,
-                cfg.dataset.num_channels,
-                cfg.dataset.img_size,
-                cfg.dataset.img_size,
-            ),
-            torch.zeros(cfg.training.batch_size, cfg.model.num_classes),
-        ),
-    )
+    x = torch.zeros(
+        cfg.training.batch_size,
+        cfg.dataset.num_channels,
+        cfg.dataset.img_size,
+        cfg.dataset.img_size,
+    ).to(model.device)
+
+    y = torch.zeros(cfg.training.batch_size, dtype=torch.long).int().to(model.device)
+
+    summary(model, (x, y))
 
 
 def get_dataloaders(cfg: DictConfig):
