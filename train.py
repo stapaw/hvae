@@ -23,17 +23,24 @@ def train(cfg: DictConfig) -> None:
         logger={"config": config},
     )
     model = hydra.utils.instantiate(cfg.model)
+    print_summary(cfg, model)
+    trainer.fit(model, train_dataloader, val_dataloader)
 
+
+def print_summary(cfg, model):
+    """Print a summary of the model."""
     summary(
         model,
-        input_size=(
-            cfg.training.batch_size,
-            cfg.dataset.num_channels,
-            cfg.dataset.img_size,
-            cfg.dataset.img_size,
+        input_data=(
+            torch.zeros(
+                cfg.training.batch_size,
+                cfg.dataset.num_channels,
+                cfg.dataset.img_size,
+                cfg.dataset.img_size,
+            ),
+            torch.zeros(cfg.training.batch_size, cfg.model.num_classes),
         ),
     )
-    trainer.fit(model, train_dataloader, val_dataloader)
 
 
 def get_dataloaders(cfg: DictConfig):
