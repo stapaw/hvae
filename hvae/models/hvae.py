@@ -12,10 +12,11 @@ from hvae.utils.dct import reconstruct_dct
 
 
 class HVAE(VAE):
-    """Conditional VAE"""
+    """Conditional hierarchical VAE"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_classes: int = None, **kwargs):
         super().__init__(**kwargs)
+        self.num_classes = num_classes
         self.nn_r_2 = MLP(
             dims=[
                 self.encoder_output_size,
@@ -45,15 +46,16 @@ class HVAE(VAE):
             ]
         )
         self.decoder_input = nn.Linear(2 * self.latent_dim, self.encoder_output_size)
+        self.fc_z = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
 
     def step(self, batch):
-        x, _ = batch
-        outputs = self.forward(x)
+        x, y = batch
+        outputs = self.forward(x, y)
         outputs["x"] = x
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"]
 
-    def forward(self, x: Tensor) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
@@ -75,8 +77,12 @@ class HVAE(VAE):
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
+
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        z_1 = torch.cat([z_1, y], dim=1)
+        z_1 = self.fc_z(z_1)
         z_1 = self.decoder_input(z_1)
-        x_hat = self.decode(z_1)
+        x_hat = self.decode(z_1, y)
 
         return {
             "x_hat": x_hat,
@@ -149,29 +155,36 @@ class HVAE(VAE):
 
 
 class DCTHVAE(HVAE):
+    """Conditional hierarchical VAE with DCT reconstruction."""
+
     def __init__(self, k: int = 16, gamma=0.5, **kwargs):
         super().__init__(**kwargs)
         self.decoder_input_dct = nn.Linear(self.latent_dim, self.encoder_output_size)
+        self.fc_z_dct = nn.Linear(self.latent_dim + self.num_classes, self.latent_dim)
         self.k = k
         self.gamma = gamma
 
     def step(self, batch):
-        x, _ = batch
-        outputs = self.forward(x)
+        x, y = batch
+        outputs = self.forward(x, y)
         outputs["x"] = x
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"], outputs["x_hat_dct"]
 
-    def forward(self, x: Tensor) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
         Returns:
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
-        outputs = super().forward(x)
-        z_2 = self.decoder_input_dct(outputs["z_2"])
-        x_hat_dct = self.decode(z_2)
+        outputs = super().forward(x, y)
+
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        z_2 = torch.cat([outputs["z_2"], y], dim=1)
+        z_2 = self.fc_z_dct(z_2)
+        z_2 = self.decoder_input_dct(z_2)
+        x_hat_dct = self.decode(z_2, y)
         outputs["x_hat_dct"] = x_hat_dct
         return outputs
 
@@ -193,11 +206,13 @@ class DCTHVAE(HVAE):
             F.mse_loss(x_hat_dct, x_dct, reduction="sum") / x_dct.shape[0]
         )
         loss["reconstruction_loss_dct"] = reconstruction_loss_dct
-        loss["loss"] += (self.gamma - 1) * loss["reconstruction_loss"] + (1-self.gamma) * reconstruction_loss_dct
+        loss["loss"] += (self.gamma - 1) * loss["reconstruction_loss"] + (
+            1 - self.gamma
+        ) * reconstruction_loss_dct
         return loss
 
     @torch.no_grad()
-    def sample(self, num_samples: int, level=0) -> Tensor:
+    def sample(self, num_samples: int, level: int = 0, y: Tensor = None) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
             num_samples: Number of samples to generate
@@ -205,14 +220,20 @@ class DCTHVAE(HVAE):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
+        if y is None:
+            y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
+        else:
+            assert y.shape[0] == num_samples
+
+        assert level in {0, 1}, f"Invalid level: {level}."
+
         z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
         if level == 1:
             z_2 = self.decoder_input_dct(z_2)
-            return self.decode(z_2)
-        elif level == 0:
+            return self.decode(z_2, y)
+        if level == 0:
             h_1 = self.nn_z_1(z_2)
             mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
             z_1 = self.reparameterize(mu_1, log_var_1)
             z_1 = self.decoder_input(z_1)
-            return self.decode(z_1)
-        raise ValueError(f"Invalid level: {level}.")
+            return self.decode(z_1, y)
