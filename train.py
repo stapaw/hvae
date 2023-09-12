@@ -24,8 +24,15 @@ def train(cfg: DictConfig) -> None:
     )
     model = hydra.utils.instantiate(cfg.model)
 
-
-    summary(model, input_size=(cfg.training.batch_size, cfg.dataset.num_channels, cfg.dataset.img_size, cfg.dataset.img_size))
+    summary(
+        model,
+        input_size=(
+            cfg.training.batch_size,
+            cfg.dataset.num_channels,
+            cfg.dataset.img_size,
+            cfg.dataset.img_size,
+        ),
+    )
     trainer.fit(model, train_dataloader, val_dataloader)
 
 
