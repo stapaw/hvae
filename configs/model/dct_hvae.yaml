@@ -1,10 +1,11 @@
 _target_: hvae.models.DCTHVAE
-k: 8
 img_size: 32
 in_channels: 3
 channels: [16, 32, 64]
 latent_dim: 16
-beta: 0.2
 gamma: 0.5
+beta: 0.5
+k: 8
 lr: 0.004
 residual: false
+num_classes: ${dataset.num_classes}
