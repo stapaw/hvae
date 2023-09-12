@@ -230,7 +230,7 @@ class DCTHVAE(HVAE):
             Tensor of shape (num_samples x C x H x W)
         """
         if y is None:
-            y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
+            y = torch.randint(self.num_classes, size=(num_samples, 1)).to(self.device)
         else:
             assert y.shape[0] == num_samples
 
