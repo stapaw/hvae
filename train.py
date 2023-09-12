@@ -38,7 +38,7 @@ def print_summary(cfg, model):
 
     y = torch.zeros(cfg.training.batch_size, dtype=torch.long).int().to(model.device)
 
-    summary(model, (x, y))
+    summary(model, input_data=(x, y))
 
 
 def get_dataloaders(cfg: DictConfig):
