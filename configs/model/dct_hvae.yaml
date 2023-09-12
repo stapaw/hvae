@@ -2,8 +2,8 @@ _target_: hvae.models.hvae.DCTHVAE
 k: 8
 img_size: 32
 in_channels: 3
-channels: [32, 64, 64, 128, 256]
-latent_dim: 16
+channels: [16,32,64]
+latent_dim: 8
 beta: 1.0
 lr: 0.004
 residual: false

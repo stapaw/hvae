@@ -4,6 +4,16 @@ import torch
 from scipy.fft import dctn, idctn
 
 
+class DCTMaskTransform:
+    def __init__(self, k, mask_func, input_shape):
+        self.mask = mask_func(k, input_shape)
+        self.input_shape = input_shape
+
+    def __call__(self, x):
+        return torch.from_numpy(idctn(dctn(x.numpy()) * self.mask).astype(np.float32))
+
+
+
 def reconstruct_dct(imgs, k):
     """Reconstruct images from their DCT coefficients.
     Args:

@@ -8,6 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
 from hvae.callbacks import LoggingCallback, MetricsCallback, VisualizationCallback
+from hvae.utils.dct import get_mask, DCTMaskTransform
 
 
 @hydra.main(config_path="configs", config_name="main")
@@ -29,11 +30,18 @@ def get_dataloaders(cfg: DictConfig):
     root = Path(hydra.utils.get_original_cwd()) / Path(cfg.dataset.root)
     if cfg.dataset.name != "cifar10":
         raise ValueError(f"Invalid dataset name: {cfg.dataset.name}.")
+    dct_mask_transform = DCTMaskTransform(16, get_mask, (1, 32, 32))
     dataset = torchvision.datasets.CIFAR10(
         root=root,
         train=True,
         download=True,
-        transform=transforms.ToTensor(),
+        transform=
+        transforms.Compose(
+            [
+            transforms.ToTensor(),
+            dct_mask_transform
+            ]
+        )
     )
     # filter out everything except desired class
     if cfg.dataset.classes is not None:
