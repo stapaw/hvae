@@ -45,7 +45,7 @@ class HVAE(VAE):
                 2 * (self.latent_dim),
             ]
         )
-        self.decoder_input = nn.Linear(2 * self.latent_dim, self.encoder_output_size)
+        self.decoder_input = nn.Linear(self.latent_dim, self.encoder_output_size)
         self.fc_z = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
 
     def step(self, batch):
