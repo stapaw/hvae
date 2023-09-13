@@ -21,12 +21,10 @@ class HVAE(VAE):
             dims=[
                 self.encoder_output_size,
                 self.encoder_output_size,
-                self.encoder_output_size,
             ]
         )
         self.nn_delta_1 = MLP(
             dims=[
-                self.encoder_output_size,
                 self.encoder_output_size,
                 2 * (self.latent_dim),
             ]
@@ -34,14 +32,12 @@ class HVAE(VAE):
         self.nn_delta_2 = MLP(
             dims=[
                 self.encoder_output_size,
-                self.encoder_output_size,
                 2 * self.latent_dim,
             ]
         )
         self.nn_z_1 = MLP(
             dims=[
                 self.latent_dim,
-                self.encoder_output_size,
                 2 * (self.latent_dim),
             ]
         )
