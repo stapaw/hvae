@@ -14,19 +14,6 @@ class VisualizationCallback(Callback):
         super().__init__()
         self._logged_dct = False
 
-    def on_validation_batch_end(
-        self,
-        trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
-        outputs,
-        batch,
-        batch_idx: int,
-        dataloader_idx: int = 0,
-    ):
-        """Visualize the first batch and reconstructions."""
-        if batch_idx == 0:
-            self.log_reconstructions(pl_module, batch)
-
     def on_training_batch_end(
         self,
         trainer: pl.Trainer,
@@ -38,10 +25,23 @@ class VisualizationCallback(Callback):
     ):
         """Visualize the first batch and reconstructions."""
         if batch_idx == 0:
-            self.log_reconstructions(pl_module, batch)
+            self.log_reconstructions(pl_module, batch, "train")
+
+    def on_validation_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        """Visualize the first batch and reconstructions."""
+        if batch_idx == 0:
+            self.log_reconstructions(pl_module, batch, "val")
 
     @torch.no_grad()
-    def log_reconstructions(self, pl_module, batch):
+    def log_reconstructions(self, pl_module: pl.LightningModule, batch, stage: str):
         x, y = batch
         pl_module.eval()
         _, *x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
@@ -53,14 +53,14 @@ class VisualizationCallback(Callback):
             images = draw_reconstructions(
                 x.detach().cpu().numpy(), x_hat[0], x_dct, x_hat[1]
             )
-        pl_module.logger.log_image("reconstructions", images=[images])
+        pl_module.logger.log_image(f"{stage}/reconstructions", images=[images])
 
         if not self._logged_dct:
             reconstructions = [
                 reconstruct_dct(x, k=k).detach().cpu().numpy() for k in [32, 16, 8, 4]
             ]
             images = draw_reconstructions(x.detach().cpu().numpy(), *reconstructions)
-            pl_module.logger.log_image("dct_reconstructions", images=[images])
+            pl_module.logger.log_image(f"{stage}/reconstructions", images=[images])
             self._logged_dct = True
 
     @torch.no_grad()
