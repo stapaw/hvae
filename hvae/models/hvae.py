@@ -17,6 +17,12 @@ class HVAE(VAE):
     def __init__(self, num_classes: int = None, **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
+        self.nn_r_1 = MLP(
+            dims=[
+                self.encoder_output_size,
+                self.encoder_output_size,
+            ]
+        )
         self.nn_r_2 = MLP(
             dims=[
                 self.encoder_output_size,
@@ -41,7 +47,14 @@ class HVAE(VAE):
                 2 * (self.latent_dim),
             ]
         )
-        self.decoder_input = nn.Linear(self.latent_dim, self.encoder_output_size)
+        self.decoder_input_1 = MLP(
+            dims=[
+                self.latent_dim,
+                2 * self.latent_dim,
+                4 * self.latent_dim,
+                self.encoder_output_size,
+            ]
+        )
         self.fc_z_2 = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
 
     def step(self, batch):
@@ -60,7 +73,8 @@ class HVAE(VAE):
         """
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
 
-        r_1 = self.encoder(x).flatten(start_dim=1)  # add an MLP between enc and r_1?
+        r_1 = self.encoder(x).flatten(start_dim=1)
+        r_1 = self.nn_r_1(r_1)
         r_2 = self.nn_r_2(r_1)
 
         delta_1 = self.nn_delta_1(r_1)
@@ -78,7 +92,7 @@ class HVAE(VAE):
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
 
-        z_1 = self.decoder_input(z_1)
+        z_1 = self.decoder_input_1(z_1)
         x_hat = self.decode(z_1)
 
         return {
@@ -155,7 +169,7 @@ class HVAE(VAE):
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1, log_var_1)
-        z_1 = self.decoder_input(z_1)
+        z_1 = self.decoder_input_1(z_1)
         return self.decode(z_1)
 
 
@@ -164,7 +178,14 @@ class DCTHVAE(HVAE):
 
     def __init__(self, gamma=0.5, k: int = 16, **kwargs):
         super().__init__(**kwargs)
-        self.decoder_input_z_2 = nn.Linear(self.latent_dim, self.encoder_output_size)
+        self.decoder_input_2 = MLP(
+            dims=[
+                self.latent_dim,
+                2 * self.latent_dim,
+                4 * self.latent_dim,
+                self.encoder_output_size,
+            ]
+        )
         self.gamma = gamma
         self.k = k
 
@@ -183,7 +204,7 @@ class DCTHVAE(HVAE):
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
         outputs = super().forward(x, y)
-        z_2 = self.decoder_input_z_2(outputs["z_2"])
+        z_2 = self.decoder_input_2(outputs["z_2"])
         x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
         return outputs
@@ -234,11 +255,11 @@ class DCTHVAE(HVAE):
         z_2 = self.fc_z_2(z_2)
 
         if level == 1:
-            z_2 = self.decoder_input_z_2(z_2)
+            z_2 = self.decoder_input_2(z_2)
             return self.decode(z_2)
         if level == 0:
             h_1 = self.nn_z_1(z_2)
             mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
             z_1 = self.reparameterize(mu_1, log_var_1)
-            z_1 = self.decoder_input(z_1)
+            z_1 = self.decoder_input_1(z_1)
             return self.decode(z_1)
