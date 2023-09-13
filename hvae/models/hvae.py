@@ -149,6 +149,7 @@ class HVAE(VAE):
             "kl_divergence": kl_divergence,
         }
 
+    @torch.no_grad()
     def sample(self, num_samples: int, y: Tensor) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
@@ -157,6 +158,8 @@ class HVAE(VAE):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
+        is_training = self.training
+        self.train(False)
         if y is None:
             y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
         else:
@@ -170,6 +173,7 @@ class HVAE(VAE):
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1, log_var_1)
         z_1 = self.decoder_input_1(z_1)
+        self.train(is_training)
         return self.decode(z_1)
 
 
@@ -241,6 +245,8 @@ class DCTHVAE(HVAE):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
+        self.is_traiing = self.training
+        self.train(False)
         if y is None:
             y = torch.randint(
                 self.num_classes, size=(num_samples, self.num_classes)
@@ -254,12 +260,14 @@ class DCTHVAE(HVAE):
         z_2 = torch.cat([z_2, y], dim=1)
         z_2 = self.fc_z_2(z_2)
 
-        if level == 1:
-            z_2 = self.decoder_input_2(z_2)
-            return self.decode(z_2)
         if level == 0:
             h_1 = self.nn_z_1(z_2)
             mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
             z_1 = self.reparameterize(mu_1, log_var_1)
             z_1 = self.decoder_input_1(z_1)
-            return self.decode(z_1)
+            result = self.decode(z_1)
+        elif level == 1:
+            z_2 = self.decoder_input_2(z_2)
+            result = self.decode(z_2)
+        self.train(self.is_traiing)
+        return result
