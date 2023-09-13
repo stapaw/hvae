@@ -7,6 +7,7 @@ import torchvision
 from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
+from torchinfo import summary
 from hvae.callbacks import LoggingCallback, MetricsCallback, VisualizationCallback
 from hvae.utils.dct import get_mask, DCTMaskTransform
 
@@ -23,25 +24,33 @@ def train(cfg: DictConfig) -> None:
         logger={"config": config},
     )
     model = hydra.utils.instantiate(cfg.model)
+    print_summary(cfg, model)
     trainer.fit(model, train_dataloader, val_dataloader)
+    # model = torch.load("/home/spawlak/hvae/pretrained_model_k8_l16.pt")
+
+def print_summary(cfg, model):
+    """Print a summary of the model."""
+    x = torch.zeros(
+        cfg.training.batch_size,
+        cfg.dataset.num_channels,
+        cfg.dataset.img_size,
+        cfg.dataset.img_size,
+    ).to(model.device)
+
+    y = torch.zeros(cfg.training.batch_size, dtype=torch.long).long().to(model.device)
+
+    summary(model, input_data=(x, y))
 
 
 def get_dataloaders(cfg: DictConfig):
     root = Path(hydra.utils.get_original_cwd()) / Path(cfg.dataset.root)
     if cfg.dataset.name != "cifar10":
         raise ValueError(f"Invalid dataset name: {cfg.dataset.name}.")
-    dct_mask_transform = DCTMaskTransform(16, get_mask, (1, 32, 32))
     dataset = torchvision.datasets.CIFAR10(
         root=root,
         train=True,
         download=True,
-        transform=
-        transforms.Compose(
-            [
-            transforms.ToTensor(),
-            dct_mask_transform
-            ]
-        )
+        transform=transforms.ToTensor(),
     )
     # filter out everything except desired class
     if cfg.dataset.classes is not None:
