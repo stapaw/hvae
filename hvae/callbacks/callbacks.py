@@ -42,8 +42,9 @@ class VisualizationCallback(Callback):
 
     @torch.no_grad()
     def log_reconstructions(self, pl_module: pl.LightningModule, batch, stage: str):
-        x, y = batch
+        is_training = pl_module.training
         pl_module.eval()
+        x, y = batch
         _, *x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
         x_hat = [x.detach().cpu().numpy() for x in x_hat]
         if len(x_hat) == 1:
@@ -62,6 +63,7 @@ class VisualizationCallback(Callback):
             images = draw_reconstructions(x.detach().cpu().numpy(), *reconstructions)
             pl_module.logger.log_image("dct_reconstructions", images=[images])
             self._logged_dct = True
+        pl_module.train(is_training)
 
     @torch.no_grad()
     def on_train_epoch_end(
