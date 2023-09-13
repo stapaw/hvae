@@ -46,8 +46,8 @@ class HVAE(VAE):
             ]
         )
         self.decoder_input = nn.Linear(self.latent_dim, self.encoder_output_size)
-        self.fc_z_2 = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
-        self.fc_z_1 = nn.Linear(self.latent_dim + self.num_classes, self.latent_dim)
+        self.fc_z_2 = nn.Linear(self.latent_dim + self.num_classes, self.latent_dim)
+        self.fc_z_1 = nn.Linear(self.latent_dim, self.latent_dim)
 
     def step(self, batch):
         x, y = batch
@@ -83,7 +83,6 @@ class HVAE(VAE):
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
 
-        z_1 = torch.cat([z_1, y], dim=1)
         z_1 = self.fc_z_1(z_1)
         z_1 = self.decoder_input(z_1)
         x_hat = self.decode(z_1)
@@ -162,7 +161,6 @@ class HVAE(VAE):
         h_1 = self.nn_z_1(z_2)
         mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
         z_1 = self.reparameterize(mu_1, log_var_1)
-        z_1 = torch.cat([z_1, y], dim=1)
         z_1 = self.fc_z_1(z_1)
         z_1 = self.decoder_input(z_1)
         return self.decode(z_1)
@@ -249,7 +247,6 @@ class DCTHVAE(HVAE):
             h_1 = self.nn_z_1(z_2)
             mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
             z_1 = self.reparameterize(mu_1, log_var_1)
-            z_1 = torch.cat([z_1, y], dim=1)
             z_1 = self.fc_z_1(z_1)
             z_1 = self.decoder_input(z_1)
             return self.decode(z_1)

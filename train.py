@@ -26,7 +26,7 @@ def train(cfg: DictConfig) -> None:
     model = hydra.utils.instantiate(cfg.model)
     print_summary(cfg, model)
     trainer.fit(model, train_dataloader, val_dataloader)
-
+    # model = torch.load("/home/spawlak/hvae/pretrained_model_k8_l16.pt")
 
 def print_summary(cfg, model):
     """Print a summary of the model."""
@@ -55,7 +55,7 @@ def get_dataloaders(cfg: DictConfig):
         transforms.Compose(
             [
             transforms.ToTensor(),
-            dct_mask_transform
+            # dct_mask_transform
             ]
         )
     )
