@@ -60,7 +60,7 @@ class VisualizationCallback(Callback):
                 reconstruct_dct(x, k=k).detach().cpu().numpy() for k in [32, 16, 8, 4]
             ]
             images = draw_reconstructions(x.detach().cpu().numpy(), *reconstructions)
-            pl_module.logger.log_image(f"{stage}/reconstructions", images=[images])
+            pl_module.logger.log_image("dct_reconstructions", images=[images])
             self._logged_dct = True
 
     @torch.no_grad()
