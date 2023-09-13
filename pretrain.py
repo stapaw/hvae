@@ -57,6 +57,7 @@ def train(cfg: DictConfig) -> None:
     )
     model = hydra.utils.instantiate(cfg.model)
     trainer.fit(model, train_dataloader, val_dataloader)
+    torch.save(model, "/home/spawlak/hvae/pretrained_model_k8_l16.pt")
 
 
 def get_dataloaders(cfg: DictConfig):
