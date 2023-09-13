@@ -14,7 +14,7 @@ class VisualizationCallback(Callback):
         super().__init__()
         self._logged_dct = False
 
-    def on_training_batch_end(
+    def on_train_batch_end(
         self,
         trainer: pl.Trainer,
         pl_module: pl.LightningModule,
