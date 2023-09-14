@@ -14,12 +14,15 @@ from hvae.utils.dct import reconstruct_dct
 class HVAE(VAE):
     """Conditional hierarchical VAE"""
 
-    def __init__(self, num_classes: int = None, **kwargs):
+    def __init__(self, num_classes: int = None, levels=2,  **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
+        self.levels = levels
+
         self.nn_r_2 = MLP(
             dims=[
                 self.encoder_output_size,
+                int(self.encoder_output_size/16),
                 self.encoder_output_size,
             ]
         )
@@ -43,7 +46,7 @@ class HVAE(VAE):
         )
         self.decoder_input = MLP(
             dims=[
-                self.latent_dim + self.num_classes,
+                self.latent_dim + self.num_classes + self.levels,
                 self.encoder_output_size,
             ]
         )
@@ -86,6 +89,7 @@ class HVAE(VAE):
 
         z_1 = self.fc_z_1(z_1)
         z_1 = torch.cat([z_1, y], dim=1)
+        z_1 = torch.cat([z_1, F.one_hot(torch.tensor([0] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
         z_1 = self.decoder_input(z_1)
         x_hat = self.decode(z_1)
 
@@ -165,6 +169,7 @@ class HVAE(VAE):
         z_1 = self.reparameterize(mu_1, log_var_1)
         z_1 = self.fc_z_1(z_1)
         z_1 = torch.cat([z_1, y], dim=1)
+        z_1 = torch.cat([z_1, F.one_hot(torch.tensor([0] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
         z_1 = self.decoder_input(z_1)
         return self.decode(z_1)
 
@@ -176,7 +181,7 @@ class DCTHVAE(HVAE):
         super().__init__(**kwargs)
         self.decoder_input_z_2 = MLP(
             dims=[
-                self.latent_dim + self.num_classes,
+                self.latent_dim + self.num_classes + self.levels,
                 self.encoder_output_size,
             ]
         )
@@ -200,6 +205,7 @@ class DCTHVAE(HVAE):
         outputs = super().forward(x, y)
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z_2 = torch.cat([outputs["z_2"], y], dim=1)
+        z_2 = torch.cat([z_2, F.one_hot(torch.tensor([1] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
         z_2 = self.decoder_input_z_2(z_2)
         x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
@@ -256,6 +262,7 @@ class DCTHVAE(HVAE):
 
         if level == 1:
             z_2 = torch.cat([z_2, y], dim=1)
+            z_2 = torch.cat([z_2, F.one_hot(torch.tensor([level] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
             z_2 = self.decoder_input_z_2(z_2)
             return self.decode(z_2)
         if level == 0:
@@ -264,5 +271,6 @@ class DCTHVAE(HVAE):
             z_1 = self.reparameterize(mu_1, log_var_1)
             z_1 = self.fc_z_1(z_1)
             z_1 = torch.cat([z_1, y], dim=1)
+            z_1 = torch.cat([z_1, F.one_hot(torch.tensor([level] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
             z_1 = self.decoder_input(z_1)
             return self.decode(z_1)

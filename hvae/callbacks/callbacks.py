@@ -3,6 +3,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import Callback
 
+from torch.nn import functional as F
 from hvae.utils.dct import reconstruct_dct
 from hvae.visualization import draw_batch, draw_reconstructions
 
@@ -53,12 +54,14 @@ class VisualizationCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         """Visualize model samples."""
-        noise=torch.randn(16, pl_module.latent_dim)
-        samples = pl_module.sample(16, noise=noise).detach().cpu().numpy()
+        noise = torch.randn(16, pl_module.latent_dim)
+        y = torch.randint(pl_module.num_classes, size=(16,)).to(pl_module.device)
+        y = F.one_hot(y, num_classes=pl_module.num_classes).float().to(pl_module.device)
+        samples = pl_module.sample(16, noise=noise, y=y).detach().cpu().numpy()
         images = draw_batch(samples)
         pl_module.logger.log_image("samples", images=[images])
 
-        samples_dct = pl_module.sample(16, level=1, noise=noise).detach().cpu().numpy()
+        samples_dct = pl_module.sample(16, level=1, noise=noise, y=y).detach().cpu().numpy()
         images = draw_batch(samples_dct)
         pl_module.logger.log_image("samples_dct", images=[images])
 
