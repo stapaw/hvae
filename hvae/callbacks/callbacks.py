@@ -1,5 +1,6 @@
 """Lightning callbacks."""
 import lightning.pytorch as pl
+import torch
 from lightning.pytorch.callbacks import Callback
 
 from hvae.utils.dct import reconstruct_dct
@@ -52,9 +53,14 @@ class VisualizationCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         """Visualize model samples."""
-        samples = pl_module.sample(25).detach().cpu().numpy()
+        noise=torch.randn(16, pl_module.latent_dim)
+        samples = pl_module.sample(16, noise=noise).detach().cpu().numpy()
         images = draw_batch(samples)
         pl_module.logger.log_image("samples", images=[images])
+
+        samples_dct = pl_module.sample(16, level=1, noise=noise).detach().cpu().numpy()
+        images = draw_batch(samples_dct)
+        pl_module.logger.log_image("samples_dct", images=[images])
 
 
 class MetricsCallback(Callback):

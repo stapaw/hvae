@@ -40,7 +40,7 @@ class VAE(pl.LightningModule):
         self.lr = lr
 
         if channels is None:
-            channels = [16, 32, 64, 64, 128]
+            channels = [32, 64, 128]
         self.channels = channels
 
 
