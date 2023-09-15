@@ -206,7 +206,7 @@ class DCTHVAE(HVAE):
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z_2 = torch.cat([outputs["z_2"], y], dim=1)
         z_2 = torch.cat([z_2, F.one_hot(torch.tensor([1] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
-        z_2 = self.decoder_input_z_2(z_2)
+        z_2 = self.decoder_input(z_2)
         x_hat_dct = self.decode(z_2)
         outputs["x_hat_dct"] = x_hat_dct
         return outputs
@@ -263,7 +263,7 @@ class DCTHVAE(HVAE):
         if level == 1:
             z_2 = torch.cat([z_2, y], dim=1)
             z_2 = torch.cat([z_2, F.one_hot(torch.tensor([level] * y.size()[0]), num_classes=self.levels).float().to(self.device)], dim=1)
-            z_2 = self.decoder_input_z_2(z_2)
+            z_2 = self.decoder_input(z_2)
             return self.decode(z_2)
         if level == 0:
             h_1 = self.nn_z_1(z_2)
