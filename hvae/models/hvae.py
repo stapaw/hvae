@@ -14,39 +14,71 @@ from hvae.utils.dct import reconstruct_dct
 class HVAE(VAE):
     """Conditional hierarchical VAE"""
 
-    def __init__(self, num_classes: int = None, **kwargs):
+    def __init__(self, num_classes: int = None, levels: int = 2, **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
-        self.nn_r_1 = MLP(
-            dims=[
-                self.encoder_output_size,
-                self.encoder_output_size,
-            ]
-        )
-        self.nn_r_2 = MLP(
-            dims=[
-                self.encoder_output_size,
-                self.encoder_output_size,
-            ]
-        )
-        self.nn_delta_1 = MLP(
-            dims=[
-                self.encoder_output_size,
-                2 * (self.latent_dim),
-            ]
-        )
-        self.nn_delta_2 = MLP(
-            dims=[
-                self.encoder_output_size,
-                2 * self.latent_dim,
-            ]
-        )
-        self.nn_z_1 = MLP(
-            dims=[
-                self.latent_dim,
-                2 * (self.latent_dim),
-            ]
-        )
+        self.nn_rs = [
+            MLP(
+                dims=[
+                    self.encoder_output_size,
+                    self.encoder_output_size,
+                ]
+            )
+            for _ in range(self.num_levels)
+        ]
+        self.nn_deltas = [
+            MLP(
+                dims=[
+                    self.encoder_output_size,
+                    2 * self.latent_dim,
+                ]
+            )
+            for _ in range(self.num_levels)
+        ]
+
+        self.nn_zs = [
+            MLP(
+                dims=[
+                    self.latent_dim,
+                    2 * self.latent_dim,
+                ]
+            )
+            for _ in range(self.num_levels)
+        ]
+
+        self.nn_fc = nn.Linear(
+            self.latent_dim + num_classes, self.latent_dim
+        )  # condition on class at the deepest level
+        # self.nn_r_1 = MLP(
+        #    dims=[
+        #        self.encoder_output_size,
+        #        self.encoder_output_size,
+        #    ]
+        # )
+        # self.nn_r_2 = MLP(
+        #    dims=[
+        #        self.encoder_output_size,
+        #        self.encoder_output_size,
+        #    ]
+        # )
+        # self.nn_delta_1 = MLP(
+        #    dims=[
+        #        self.encoder_output_size,
+        #        2 * (self.latent_dim),
+        #    ]
+        # )
+        # self.nn_delta_2 = MLP(
+        #    dims=[
+        #        self.encoder_output_size,
+        #        2 * self.latent_dim,
+        #    ]
+        # )
+        # self.nn_z_1 = MLP(
+        #    dims=[
+        #        self.latent_dim,
+        #        2 * (self.latent_dim),
+        #    ]
+        # )
         self.decoder_input_1 = MLP(
             dims=[
                 self.latent_dim,
@@ -72,6 +104,28 @@ class HVAE(VAE):
             List of tensors [reconstructed input, latent mean, latent log variance]
         """
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+
+        rs = []
+        for net in self.nn_rs:
+            x = net(x)
+            rs.append(x.clone())
+
+        deltas = []
+        for net in self.nn_deltas:
+            x = net(x)
+            delta_mu, delta_log_var = torch.chunk(x, 2, dim=1)
+            delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
+            deltas.append((delta_mu, delta_log_var))
+
+        zs = []
+        previous_delta_mu, previous_delta_log_var = None, None
+        for delta_mu, delta_log_var in reversed(zip(deltas, rs)):
+            if previous_delta_mu is not None:
+                delta_mu = delta_mu + previous_delta_mu
+                delta_log_var = delta_log_var + previous_delta_log_var
+            z = self.reparameterize(delta_mu, delta_log_var)
+            zs.append(z)
+            previous_delta_mu, previous_delta_log_var = delta_mu, delta_log_var
 
         r_1 = self.encoder(x).flatten(start_dim=1)
         r_1 = self.nn_r_1(r_1)
@@ -164,6 +218,7 @@ class HVAE(VAE):
             y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
         else:
             assert y.shape[0] == num_samples
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
 
         z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
         z_2 = torch.cat([z_2, y], dim=1)
@@ -253,6 +308,7 @@ class DCTHVAE(HVAE):
             ).to(self.device)
         else:
             assert y.shape[0] == num_samples
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
 
         assert level in {0, 1}, f"Invalid level: {level}."
 
