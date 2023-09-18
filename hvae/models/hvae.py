@@ -63,7 +63,7 @@ class HVAE(VAE):
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"]
 
-    def forward(self, x: Tensor, y: Tensor, level: int) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor, level: int = 0) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
