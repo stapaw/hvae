@@ -4,7 +4,7 @@ from lightning.pytorch.callbacks import Callback
 import torch
 
 from hvae.utils.dct import reconstruct_dct
-from hvae.visualization import draw_batch, draw_reconstructions
+from hvae.visualization import draw_reconstructions
 
 
 class VisualizationCallback(Callback):
@@ -45,15 +45,10 @@ class VisualizationCallback(Callback):
         is_training = pl_module.training
         pl_module.eval()
         x, y = batch
-        _, *x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
-        x_hat = [x.detach().cpu().numpy() for x in x_hat]
-        if len(x_hat) == 1:
-            images = draw_reconstructions(x.detach().cpu().numpy(), x_hat[0])
-        elif len(x_hat) == 2:
-            x_dct = reconstruct_dct(x, k=pl_module.k).detach().cpu().numpy()
-            images = draw_reconstructions(
-                x.detach().cpu().numpy(), x_hat[0], x_dct, x_hat[1]
-            )
+        _, x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
+        images = draw_reconstructions(
+            x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
+        )
         pl_module.logger.log_image(f"{stage}/reconstructions", images=[images])
 
         if not self._logged_dct:
