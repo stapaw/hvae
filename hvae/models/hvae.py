@@ -72,6 +72,7 @@ class HVAE(VAE):
         """
         assert level < self.num_levels, f"Invalid level: {level}."
 
+        x = self.encoder(x).flatten(start_dim=1)
         rs = []
         for net in self.r_nets:
             x = net(x)
