@@ -25,7 +25,7 @@ class HVAE(VAE):
                     self.encoder_output_size,
                     self.encoder_output_size,
                 ]
-            ).to(self.device)
+            )
             for _ in range(self.num_levels)
         ]
         self.delta_nets = [
