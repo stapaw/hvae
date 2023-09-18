@@ -88,7 +88,7 @@ class HVAE(VAE):
         zs = []
         mu_log_vars = []
         previous_z = None
-        for delta_mu, delta_log_var, net in zip(
+        for (delta_mu, delta_log_var), net in zip(
             reversed(mu_log_var_deltas), reversed(self.z_nets)
         ):
             if previous_z is None:
