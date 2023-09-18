@@ -56,6 +56,20 @@ class HVAE(VAE):
             ]
         )
 
+    def configure_optimizers(self):
+        """Configure the optimizers."""
+        params = [
+            {"params": self.parameters(), "lr": self.lr},
+            #    {"params": self.encoder.parameters(), "lr": self.lr},
+            #    {"params": self.decoder_input.parameters(), "lr": self.lr},
+            #    {"params": self.decoder.parameters(), "lr": self.lr},
+        ]
+        # params.extend(
+        #    {"params": net.parameters(), "lr": self.lr}
+        #    for net in self.r_nets + self.delta_nets + self.z_nets
+        # )
+        return torch.optim.Adam(params)
+
     def step(self, batch):
         x, y = batch
         outputs = self.forward(x, y)
@@ -212,7 +226,7 @@ class DCTHVAE(HVAE):
         x, y = batch
         losses = []
         for i, k in enumerate(self.ks):
-            x_dct = reconstruct_dct(x, k=k)
+            x_dct = reconstruct_dct(x, k=k).to(self.device)
             outputs = self.forward(x_dct, y, level=i)
             outputs["x"] = x_dct
             losses.append(self.loss_function(**outputs))
