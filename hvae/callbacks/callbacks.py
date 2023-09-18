@@ -70,9 +70,12 @@ class VisualizationCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         """Visualize model samples."""
-        samples = pl_module.sample(25).detach().cpu().numpy()
-        images = draw_batch(samples)
-        pl_module.logger.log_image("samples", images=[images])
+        samples = [
+            pl_module.sample(10, level=i).detach().cpu().numpy()
+            for i in range(pl_module.num_levels)
+        ]
+        images = draw_reconstructions(*samples)
+        pl_module.logger.log_image("train/samples", images=[images])
 
 
 class MetricsCallback(Callback):
