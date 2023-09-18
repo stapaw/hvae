@@ -3,7 +3,7 @@ Based on https://github.com/jmtomczak/intro_dgm/blob/main/vaes/vae_hierarchical_
 """
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.nn import functional as F
 
 from hvae.models import VAE
@@ -14,10 +14,12 @@ from hvae.utils.dct import reconstruct_dct
 class HVAE(VAE):
     """Conditional hierarchical VAE"""
 
-    def __init__(self, num_classes: int = None, levels: int = 2, **kwargs):
+    def __init__(self, num_classes: int = None, num_levels: int = 4, **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
-        self.nn_rs = [
+        self.num_levels = num_levels
+
+        self.r_nets = [
             MLP(
                 dims=[
                     self.encoder_output_size,
@@ -26,7 +28,7 @@ class HVAE(VAE):
             )
             for _ in range(self.num_levels)
         ]
-        self.nn_deltas = [
+        self.delta_nets = [
             MLP(
                 dims=[
                     self.encoder_output_size,
@@ -36,58 +38,23 @@ class HVAE(VAE):
             for _ in range(self.num_levels)
         ]
 
-        self.nn_zs = [
+        self.z_nets = [
             MLP(
                 dims=[
                     self.latent_dim,
                     2 * self.latent_dim,
                 ]
             )
-            for _ in range(self.num_levels)
-        ]
+            for _ in range(self.num_levels - 1)
+        ] + [None]
 
-        self.nn_fc = nn.Linear(
-            self.latent_dim + num_classes, self.latent_dim
-        )  # condition on class at the deepest level
-        # self.nn_r_1 = MLP(
-        #    dims=[
-        #        self.encoder_output_size,
-        #        self.encoder_output_size,
-        #    ]
-        # )
-        # self.nn_r_2 = MLP(
-        #    dims=[
-        #        self.encoder_output_size,
-        #        self.encoder_output_size,
-        #    ]
-        # )
-        # self.nn_delta_1 = MLP(
-        #    dims=[
-        #        self.encoder_output_size,
-        #        2 * (self.latent_dim),
-        #    ]
-        # )
-        # self.nn_delta_2 = MLP(
-        #    dims=[
-        #        self.encoder_output_size,
-        #        2 * self.latent_dim,
-        #    ]
-        # )
-        # self.nn_z_1 = MLP(
-        #    dims=[
-        #        self.latent_dim,
-        #        2 * (self.latent_dim),
-        #    ]
-        # )
-        self.decoder_input_1 = MLP(
+        self.decoder_input = MLP(
             dims=[
-                self.latent_dim,
-                2 * self.latent_dim,
-                4 * self.latent_dim,
+                (self.num_levels * self.latent_dim) + num_classes,
+                2 * self.num_levels * self.latent_dim,
                 self.encoder_output_size,
             ]
         )
-        self.fc_z_2 = nn.Linear(self.latent_dim + num_classes, self.latent_dim)
 
     def step(self, batch):
         x, y = batch
@@ -96,79 +63,66 @@ class HVAE(VAE):
         loss = self.loss_function(**outputs)
         return loss, outputs["x_hat"]
 
-    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor, level: int) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
         Returns:
-            List of tensors [reconstructed input, latent mean, latent log variance]
+            A dictionary of tensors (x_hat, mu_log_vars, mu_log_var_deltas)
         """
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        assert level < self.num_levels, f"Invalid level: {level}."
 
         rs = []
-        for net in self.nn_rs:
+        for net in self.r_nets:
             x = net(x)
             rs.append(x.clone())
 
-        deltas = []
-        for net in self.nn_deltas:
-            x = net(x)
-            delta_mu, delta_log_var = torch.chunk(x, 2, dim=1)
+        mu_log_var_deltas = []
+        for r, net in zip(rs, self.delta_nets):
+            delta = net(r)
+            delta_mu, delta_log_var = torch.chunk(delta, 2, dim=1)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
-            deltas.append((delta_mu, delta_log_var))
+            mu_log_var_deltas.append((delta_mu, delta_log_var))
 
         zs = []
-        previous_delta_mu, previous_delta_log_var = None, None
-        for delta_mu, delta_log_var in reversed(zip(deltas, rs)):
-            if previous_delta_mu is not None:
-                delta_mu = delta_mu + previous_delta_mu
-                delta_log_var = delta_log_var + previous_delta_log_var
-            z = self.reparameterize(delta_mu, delta_log_var)
+        mu_log_vars = []
+        previous_z = None
+        for delta_mu, delta_log_var, net in reversed(
+            zip(mu_log_var_deltas, self.z_nets)
+        ):
+            if previous_z is None:
+                mu_log_vars.append((None, None))
+                z = self.reparameterize(delta_mu, delta_log_var)
+            else:
+                mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
+                mu_log_vars.append((mu, log_var))
+                z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
             zs.append(z)
-            previous_delta_mu, previous_delta_log_var = delta_mu, delta_log_var
+            previous_z = z
+        zs = list(reversed(zs))
+        mu_log_vars = list(reversed(mu_log_vars))
+        for i in range(level):
+            zs[i] = torch.zeros_like(zs[i])
 
-        r_1 = self.encoder(x).flatten(start_dim=1)
-        r_1 = self.nn_r_1(r_1)
-        r_2 = self.nn_r_2(r_1)
+        # concatenate all zs and a one-hot encoding of y
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        z = torch.cat([*zs, y], dim=1)
 
-        delta_1 = self.nn_delta_1(r_1)
-        delta_mu_1, delta_log_var_1 = torch.chunk(delta_1, 2, dim=1)
-        delta_log_var_1 = F.hardtanh(delta_log_var_1, -7.0, 2.0)
-
-        delta_2 = self.nn_delta_2(r_2)
-        delta_mu_2, delta_log_var_2 = torch.chunk(delta_2, 2, dim=1)
-        delta_log_var_2 = F.hardtanh(delta_log_var_2, -7.0, 2.0)
-        z_2 = self.reparameterize(delta_mu_2, delta_log_var_2)
-        z_2 = torch.cat([z_2, y], dim=1)
-        z_2 = self.fc_z_2(z_2)
-
-        h_1 = self.nn_z_1(z_2)
-        mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
-        z_1 = self.reparameterize(mu_1 + delta_mu_1, log_var_1 + delta_log_var_1)
-
-        z_1 = self.decoder_input_1(z_1)
-        x_hat = self.decode(z_1)
+        # decode into the image space
+        x_hat = self.decode(self.decoder_input(z))
 
         return {
             "x_hat": x_hat,
-            "delta_mu_1": delta_mu_1,
-            "delta_log_var_1": delta_log_var_1,
-            "log_var_1": log_var_1,
-            "delta_mu_2": delta_mu_2,
-            "delta_log_var_2": delta_log_var_2,
-            "z_2": z_2,
+            "mu_log_vars": mu_log_vars,
+            "mu_log_var_deltas": mu_log_var_deltas,
         }
 
     def loss_function(
         self,
         x: Tensor,
         x_hat: Tensor,
-        delta_mu_1: Tensor,
-        delta_log_var_1: Tensor,
-        log_var_1: Tensor,
-        delta_mu_2: Tensor,
-        delta_log_var_2: Tensor,
-        **kwargs,
+        mu_log_vars: list[Tensor],
+        mu_log_var_deltas: list[Tensor],
     ) -> dict:
         """Compute the loss given ground truth images and their reconstructions.
         Args:
@@ -182,19 +136,21 @@ class HVAE(VAE):
         """
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
-        kl_divergence_z_1 = 0.5 * (
-            delta_mu_1**2 / torch.exp(log_var_1)
-            + torch.exp(delta_log_var_1)
-            - delta_log_var_1
-            - 1
-        ).sum(-1)
+        kl_divergences = []
+        for mu, log_var, delta_mu, delta_log_var in zip(mu_log_vars, mu_log_var_deltas):
+            if mu is not None:
+                kl_divergences.append(
+                    delta_mu**2 / torch.exp(log_var)
+                    + torch.exp(delta_log_var)
+                    - delta_log_var
+                    - 1
+                ).mean()
+            else:
+                kl_divergences.append(
+                    delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
+                ).mean()
 
-        kl_divergence_z_2 = 0.5 * (
-            delta_mu_2**2 + torch.exp(delta_log_var_2) - delta_log_var_2 - 1
-        ).sum(-1)
-
-        kl_divergence = kl_divergence_z_1.mean() + kl_divergence_z_2.mean()
-
+        kl_divergence = sum(kl_divergences) / len(kl_divergences)
         loss = reconstruction_loss + self.beta * kl_divergence
 
         return {
@@ -204,7 +160,7 @@ class HVAE(VAE):
         }
 
     @torch.no_grad()
-    def sample(self, num_samples: int, y: Tensor) -> Tensor:
+    def sample(self, num_samples: int, y: Tensor = None, level: int = 0) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
             num_samples: Number of samples to generate
@@ -212,118 +168,52 @@ class HVAE(VAE):
         Returns:
             Tensor of shape (num_samples x C x H x W)
         """
-        is_training = self.training
-        self.train(False)
+        assert level < self.num_levels, f"Invalid level: {level}."
         if y is None:
             y = torch.randint(self.num_classes, size=(num_samples,)).to(self.device)
         else:
-            assert y.shape[0] == num_samples
+            assert y.shape[0] == num_samples, "Invalid number of samples."
+
+        z = torch.randn(num_samples, self.latent_dim).to(self.device)
+        zs = []
+        for net in reversed(self.z_nets[:-1]):
+            z = net(z)
+            mu, log_var = torch.chunk(z, 2, dim=1)
+            z = self.reparameterize(mu, log_var)
+            zs.append(z.clone())
+        zs = list(reversed(zs))
+
+        for i in range(level):
+            zs[i] = torch.zeros_like(zs[i])
+
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        z = torch.cat([*zs, y], dim=1)
+        z = self.decoder_input(z)
 
-        z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
-        z_2 = torch.cat([z_2, y], dim=1)
-        z_2 = self.fc_z_2(z_2)
-
-        h_1 = self.nn_z_1(z_2)
-        mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
-        z_1 = self.reparameterize(mu_1, log_var_1)
-        z_1 = self.decoder_input_1(z_1)
-        self.train(is_training)
-        return self.decode(z_1)
+        return self.decode(z)
 
 
 class DCTHVAE(HVAE):
     """Conditional hierarchical VAE with DCT reconstruction."""
 
-    def __init__(self, gamma=0.5, k: int = 16, **kwargs):
+    def __init__(self, ks: list[int] = None, **kwargs):
         super().__init__(**kwargs)
-        self.decoder_input_2 = MLP(
-            dims=[
-                self.latent_dim,
-                2 * self.latent_dim,
-                4 * self.latent_dim,
-                self.encoder_output_size,
-            ]
-        )
-        self.gamma = gamma
-        self.k = k
+        if ks is None:
+            # distribute k between 64 and 1 evenly
+            ks = [int(64 / (self.levels - 1) * i) for i in range(self.levels)]
+
+        assert (
+            len(ks) == self.num_levels
+        ), f"Invalid length: ks should have {self.num_levels} elements."
+        self.ks = ks
 
     def step(self, batch):
         x, y = batch
-        outputs = self.forward(x, y)
-        outputs["x"] = x
-        loss = self.loss_function(**outputs)
-        return loss, outputs["x_hat"], outputs["x_hat_dct"]
-
-    def forward(self, x: Tensor, y: Tensor) -> list[Tensor]:
-        """Perform the forward pass.
-        Args:
-            x: Input tensor of shape (B x C x H x W)
-        Returns:
-            List of tensors [reconstructed input, latent mean, latent log variance]
-        """
-        outputs = super().forward(x, y)
-        z_2 = self.decoder_input_2(outputs["z_2"])
-        x_hat_dct = self.decode(z_2)
-        outputs["x_hat_dct"] = x_hat_dct
-        return outputs
-
-    def loss_function(self, **kwargs) -> dict:
-        """Compute the loss given ground truth images and their reconstructions.
-        Args:
-            x: Ground truth images of shape (B x C x H x W)
-            x_hat: Reconstructed images of shape (B x C x H x W)
-            mu: Latent mean of shape (B x D)
-            log_var: Latent log variance of shape (B x D)
-            kld_weight: Weight for the Kullback-Leibler divergence term
-        Returns:
-            Dictionary containing the loss value and the individual losses
-        """
-        loss = super().loss_function(**kwargs)
-        x_hat_dct = kwargs["x_hat_dct"]
-        x_dct = reconstruct_dct(kwargs["x"], k=self.k).to(self.device)
-        reconstruction_loss_dct = (
-            F.mse_loss(x_hat_dct, x_dct, reduction="sum") / x_dct.shape[0]
-        )
-        loss["reconstruction_loss_dct"] = reconstruction_loss_dct
-        loss["loss"] += (self.gamma - 1) * loss["reconstruction_loss"] + (
-            1 - self.gamma
-        ) * reconstruction_loss_dct
-        return loss
-
-    @torch.no_grad()
-    def sample(self, num_samples: int, level: int = 0, y: Tensor = None) -> Tensor:
-        """Sample a vector in the latent space and return the corresponding image.
-        Args:
-            num_samples: Number of samples to generate
-            current_device: Device to run the model
-        Returns:
-            Tensor of shape (num_samples x C x H x W)
-        """
-        self.is_traiing = self.training
-        self.train(False)
-        if y is None:
-            y = torch.randint(
-                self.num_classes, size=(num_samples, self.num_classes)
-            ).to(self.device)
-        else:
-            assert y.shape[0] == num_samples
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-
-        assert level in {0, 1}, f"Invalid level: {level}."
-
-        z_2 = torch.randn(num_samples, self.latent_dim).to(self.device)
-        z_2 = torch.cat([z_2, y], dim=1)
-        z_2 = self.fc_z_2(z_2)
-
-        if level == 0:
-            h_1 = self.nn_z_1(z_2)
-            mu_1, log_var_1 = torch.chunk(h_1, 2, dim=1)
-            z_1 = self.reparameterize(mu_1, log_var_1)
-            z_1 = self.decoder_input_1(z_1)
-            result = self.decode(z_1)
-        elif level == 1:
-            z_2 = self.decoder_input_2(z_2)
-            result = self.decode(z_2)
-        self.train(self.is_traiing)
-        return result
+        losses = []
+        for i, k in enumerate(self.ks):
+            x_dct = reconstruct_dct(x, k=k)
+            outputs = self.forward(x_dct, y, level=i)
+            outputs["x"] = x_dct
+            losses.append(self.loss_function(**outputs))
+        loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
+        return loss, outputs["x_hat"]
