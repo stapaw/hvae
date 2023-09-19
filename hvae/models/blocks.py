@@ -56,7 +56,7 @@ class Decoder(nn.Module):
         channels: list[int],
         out_channels: int = 1,
         activation: Callable = nn.GELU,
-        last_activation: Callable = nn.Sigmoid,
+        last_activation: Callable = nn.Identity,
     ) -> None:
         """Initialize the decoder.
         Args:
@@ -131,7 +131,7 @@ class MLP(nn.Module):
         self,
         dims: list[int],
         activation: Callable = nn.GELU,
-        last_activation: Callable = nn.Sigmoid,
+        last_activation: Callable = nn.Identity,
     ):
         super().__init__()
         modules = [
