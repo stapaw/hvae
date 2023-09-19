@@ -233,9 +233,6 @@ class DCTHVAE(HVAE):
         x, y = batch
         losses = []
         for level, k in enumerate(self.ks):
-            print("\n\n\n\n")
-            print(self.device)
-            print("\n\n\n\n")
             x_dct = reconstruct_dct(x, k=k).to(self.device)
             outputs = self.forward(x_dct, y, level=level)
             outputs["x"] = x_dct
