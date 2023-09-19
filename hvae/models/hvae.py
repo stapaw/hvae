@@ -221,9 +221,9 @@ class DCTHVAE(HVAE):
     def step(self, batch):
         x, y = batch
         losses = []
-        for i, k in enumerate(self.ks):
+        for level, k in enumerate(self.ks):
             x_dct = reconstruct_dct(x, k=k).to(self.device)
-            outputs = self.forward(x_dct, y, level=i)
+            outputs = self.forward(x_dct, y, level=level)
             outputs["x"] = x_dct
             losses.append(self.loss_function(**outputs))
         loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
