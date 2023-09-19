@@ -15,7 +15,7 @@ from hvae.utils.dct import reconstruct_dct
 class HVAE(VAE):
     """Conditional hierarchical VAE"""
 
-    def __init__(self, num_classes: int = None, num_levels: int = 4, **kwargs):
+    def __init__(self, num_classes: int = None, num_levels: int = 2, **kwargs):
         super().__init__(**kwargs)
         self.num_classes = num_classes
         self.num_levels = num_levels
