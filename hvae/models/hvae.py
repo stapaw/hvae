@@ -55,7 +55,7 @@ class HVAE(VAE):
                 )
                 for _ in range(self.num_levels - 1)
             ]
-            + [None]
+            + [nn.Identity()]
         )
 
         self.decoder_input = MLP(
@@ -68,16 +68,14 @@ class HVAE(VAE):
     def configure_optimizers(self):
         """Configure the optimizers."""
         params = [
-            {"params": self.parameters(), "lr": self.lr},
-            # {"params": self.encoder.parameters(), "lr": self.lr},
-            # {"params": self.decoder_input.parameters(), "lr": self.lr},
-            # {"params": self.decoder.parameters(), "lr": self.lr},
+            # {"params": self.parameters(), "lr": self.lr},
+            {"params": self.encoder.parameters(), "lr": self.lr},
+            {"params": self.decoder_input.parameters(), "lr": self.lr},
+            {"params": self.decoder.parameters(), "lr": self.lr},
+            {"params": self.r_nets.parameters(), "lr": self.lr},
+            {"params": self.delta_nets.parameters(), "lr": self.lr},
+            {"params": self.z_nets.parameters(), "lr": self.lr},
         ]
-        # params.extend(
-        #    {"params": net.parameters(), "lr": self.lr}
-        #    for net in self.r_nets + self.delta_nets + self.z_nets
-        #    if net is not None
-        # )
         return torch.optim.Adam(params)
 
     def step(self, batch):
@@ -125,16 +123,17 @@ class HVAE(VAE):
                 mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
+            assert not torch.isnan(z).any(), "z is NaN"
             # TODO: check if z is NaN
             zs.append(z)
             previous_z = z
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
 
-        for i in range(level):
-            zs[i][:] = 0
+        # for i in range(level):
+        #    zs[i][:] = 0
 
-        # concatenate all zs and a one-hot encoding of y
+        # concatenate a one-hot encoding of y
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z = torch.cat([zs[level], y], dim=1)
 
