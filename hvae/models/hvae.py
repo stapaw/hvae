@@ -199,9 +199,8 @@ class HVAE(VAE):
         else:
             assert y.shape[0] == num_samples, "Invalid number of samples."
 
-        zs = []
         z = torch.randn(num_samples, self.latent_dim).to(self.device)
-        zs.append(z)
+        zs = [z]
         for net in reversed(self.z_nets[:-1]):
             z = net(z)
             mu, log_var = torch.chunk(z, 2, dim=1)
