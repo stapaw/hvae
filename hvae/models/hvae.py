@@ -185,7 +185,7 @@ class HVAE(VAE):
         return {
             "loss": loss,
             "reconstruction_loss": reconstruction_loss,
-            # "kl_divergence": kld,
+            "kl_divergence": kld,
         }
 
     @torch.no_grad()
