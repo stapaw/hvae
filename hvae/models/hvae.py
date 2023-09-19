@@ -3,6 +3,7 @@ Based on https://github.com/jmtomczak/intro_dgm/blob/main/vaes/vae_hierarchical_
 """
 
 import torch
+import torch.nn as nn
 from torch import Tensor
 from torch.nn import functional as F
 
@@ -19,34 +20,40 @@ class HVAE(VAE):
         self.num_classes = num_classes
         self.num_levels = num_levels
 
-        self.r_nets = [
-            MLP(
-                dims=[
-                    self.encoder_output_size,
-                    self.encoder_output_size,
-                ]
-            )
-            for _ in range(self.num_levels)
-        ]
-        self.delta_nets = [
-            MLP(
-                dims=[
-                    self.encoder_output_size,
-                    2 * self.latent_dim,
-                ]
-            )
-            for _ in range(self.num_levels)
-        ]
+        self.r_nets = nn.ModuleList(
+            [
+                MLP(
+                    dims=[
+                        self.encoder_output_size,
+                        self.encoder_output_size,
+                    ]
+                )
+                for _ in range(self.num_levels)
+            ]
+        )
+        self.delta_nets = nn.ModuleList(
+            [
+                MLP(
+                    dims=[
+                        self.encoder_output_size,
+                        2 * self.latent_dim,
+                    ]
+                )
+                for _ in range(self.num_levels)
+            ]
+        )
 
-        self.z_nets = [
-            MLP(
-                dims=[
-                    self.latent_dim,
-                    2 * self.latent_dim,
-                ]
-            )
-            for _ in range(self.num_levels - 1)
-        ] + [None]
+        self.z_nets = nn.ModuleList(
+            [
+                MLP(
+                    dims=[
+                        self.latent_dim,
+                        2 * self.latent_dim,
+                    ]
+                )
+                for _ in range(self.num_levels - 1)
+            ] + [None]
+        )
 
         self.decoder_input = MLP(
             dims=[
