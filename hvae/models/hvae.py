@@ -163,24 +163,24 @@ class HVAE(VAE):
         """
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
-        # klds = []
-        # for (mu, log_var), (delta_mu, delta_log_var) in zip(
-        #    mu_log_vars, mu_log_var_deltas
-        # ):
-        #    if mu is not None:
-        #        klds.append(
-        #            0.5 * delta_mu**2 / torch.exp(log_var)
-        #            + torch.exp(delta_log_var)
-        #            - delta_log_var
-        #            - 1
-        #        )
-        #    else:
-        #        klds.append(
-        #            0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
-        #        )
+        klds = []
+        for (mu, log_var), (delta_mu, delta_log_var) in zip(
+            mu_log_vars, mu_log_var_deltas
+        ):
+            if mu is not None:
+                klds.append(
+                    0.5 * delta_mu**2 / torch.exp(log_var)
+                    + torch.exp(delta_log_var)
+                    - delta_log_var
+                    - 1
+                )
+            else:
+                klds.append(
+                    0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
+                )
 
-        # kld = sum(klds).sum() / x.shape[0]
-        loss = reconstruction_loss  # + self.beta * kld
+        kld = sum(klds).sum() / x.shape[0]
+        loss = reconstruction_loss + self.beta * kld
 
         return {
             "loss": loss,
