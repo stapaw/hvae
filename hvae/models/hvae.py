@@ -222,7 +222,7 @@ class DCTHVAE(HVAE):
     """Conditional hierarchical VAE with DCT reconstruction."""
 
     def __init__(self, ks: list[int], **kwargs):
-        super().__init__(level=len(ks), **kwargs)
+        super().__init__(num_levels=len(ks), **kwargs)
         self.ks = ks
 
     def step(self, batch):
