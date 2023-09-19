@@ -105,7 +105,7 @@ class HVAE(VAE):
             delta = net(r)
             delta_mu, delta_log_var = torch.chunk(delta, 2, dim=1)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
-            mu_log_var_deltas.append((delta_mu, delta_log_var))
+            mu_log_var_deltas.append((delta_mu.clone(), delta_log_var.clone()))
 
         zs = []
         mu_log_vars = []
@@ -120,7 +120,7 @@ class HVAE(VAE):
                 mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
-            zs.append(z)
+            zs.append(z.clone())
             previous_z = z
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
