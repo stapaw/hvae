@@ -68,13 +68,7 @@ class HVAE(VAE):
     def configure_optimizers(self):
         """Configure the optimizers."""
         params = [
-            # {"params": self.parameters(), "lr": self.lr},
-            {"params": self.encoder.parameters(), "lr": self.lr},
-            {"params": self.decoder_input.parameters(), "lr": self.lr},
-            {"params": self.decoder.parameters(), "lr": self.lr},
-            {"params": self.r_nets.parameters(), "lr": self.lr},
-            {"params": self.delta_nets.parameters(), "lr": self.lr},
-            {"params": self.z_nets.parameters(), "lr": self.lr},
+            {"params": self.parameters(), "lr": self.lr},
         ]
         return torch.optim.Adam(params)
 
