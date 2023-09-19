@@ -87,8 +87,14 @@ class HVAE(VAE):
         assert level < self.num_levels, f"Invalid level: {level}."
 
         x = self.encoder(x).flatten(start_dim=1)
+        print("\n\n\n\n")
+        print(x.device)
+        print("\n\n\n\n")
         rs = []
         for net in self.r_nets:
+            print("\n\n\n\n")
+            print(net.device)
+            print("\n\n\n\n")
             x = net(x)
             rs.append(x.clone())
 
