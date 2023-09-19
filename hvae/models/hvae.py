@@ -68,15 +68,15 @@ class HVAE(VAE):
         """Configure the optimizers."""
         params = [
             {"params": self.parameters(), "lr": self.lr},
-            {"params": self.encoder.parameters(), "lr": self.lr},
-            {"params": self.decoder_input.parameters(), "lr": self.lr},
-            {"params": self.decoder.parameters(), "lr": self.lr},
+            # {"params": self.encoder.parameters(), "lr": self.lr},
+            # {"params": self.decoder_input.parameters(), "lr": self.lr},
+            # {"params": self.decoder.parameters(), "lr": self.lr},
         ]
-        params.extend(
-            {"params": net.parameters(), "lr": self.lr}
-            for net in self.r_nets + self.delta_nets + self.z_nets
-            if net is not None
-        )
+        # params.extend(
+        #    {"params": net.parameters(), "lr": self.lr}
+        #    for net in self.r_nets + self.delta_nets + self.z_nets
+        #    if net is not None
+        # )
         return torch.optim.Adam(params)
 
     def step(self, batch):
