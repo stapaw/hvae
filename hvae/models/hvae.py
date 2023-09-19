@@ -98,14 +98,14 @@ class HVAE(VAE):
         rs = []
         for net in self.r_nets:
             x = net(x)
-            rs.append(x.clone())
+            rs.append(x)
 
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
             delta = net(r)
             delta_mu, delta_log_var = torch.chunk(delta, 2, dim=1)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
-            mu_log_var_deltas.append((delta_mu.clone(), delta_log_var.clone()))
+            mu_log_var_deltas.append((delta_mu, delta_log_var))
 
         zs = []
         mu_log_vars = []
@@ -120,7 +120,7 @@ class HVAE(VAE):
                 mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
-            zs.append(z.clone())
+            zs.append(z)
             previous_z = z
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
@@ -201,12 +201,12 @@ class HVAE(VAE):
 
         zs = []
         z = torch.randn(num_samples, self.latent_dim).to(self.device)
-        zs.append(z.clone())
+        zs.append(z)
         for net in reversed(self.z_nets[:-1]):
             z = net(z)
             mu, log_var = torch.chunk(z, 2, dim=1)
             z = self.reparameterize(mu, log_var)
-            zs.append(z.clone())
+            zs.append(z)
         zs = list(reversed(zs))
 
         for i in range(level):
