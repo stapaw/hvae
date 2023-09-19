@@ -75,6 +75,7 @@ class HVAE(VAE):
         params.extend(
             {"params": net.parameters(), "lr": self.lr}
             for net in self.r_nets + self.delta_nets + self.z_nets
+            if net is not None
         )
         return torch.optim.Adam(params)
 
