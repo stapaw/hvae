@@ -211,12 +211,8 @@ class HVAE(VAE):
 class DCTHVAE(HVAE):
     """Conditional hierarchical VAE with DCT reconstruction."""
 
-    def __init__(self, ks: list[int] = None, **kwargs):
+    def __init__(self, ks: list[int], **kwargs):
         super().__init__(**kwargs)
-        if ks is None:
-            # distribute k between 64 and 1 evenly
-            ks = [int(64 / (self.levels - 1) * i) for i in range(self.levels)]
-
         assert (
             len(ks) == self.num_levels
         ), f"Invalid length: ks should have {self.num_levels} elements."
