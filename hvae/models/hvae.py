@@ -162,29 +162,29 @@ class HVAE(VAE):
         """
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
-        kl_divergences = []
+        klds = []
         for (mu, log_var), (delta_mu, delta_log_var) in zip(
             mu_log_vars, mu_log_var_deltas
         ):
             if mu is not None:
-                kl_divergences.append(
+                klds.append(
                     delta_mu**2 / torch.exp(log_var)
                     + torch.exp(delta_log_var)
                     - delta_log_var
                     - 1
-                ).mean()
+                )
             else:
-                kl_divergences.append(
+                klds.append(
                     delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
-                ).mean()
+                )
 
-        kl_divergence = sum(kl_divergences) / len(kl_divergences)
-        loss = reconstruction_loss + self.beta * kl_divergence
+        kld = sum(kld.mean() for kld in klds) / len(klds)
+        loss = reconstruction_loss + self.beta * kld
 
         return {
             "loss": loss,
             "reconstruction_loss": reconstruction_loss,
-            "kl_divergence": kl_divergence,
+            "kl_divergence": kld,
         }
 
     @torch.no_grad()
