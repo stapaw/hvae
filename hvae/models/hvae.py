@@ -52,7 +52,8 @@ class HVAE(VAE):
                     ]
                 )
                 for _ in range(self.num_levels - 1)
-            ] + [None]
+            ]
+            + [None]
         )
 
         self.decoder_input = MLP(
@@ -162,7 +163,9 @@ class HVAE(VAE):
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
         kl_divergences = []
-        for mu, log_var, delta_mu, delta_log_var in zip(mu_log_vars, mu_log_var_deltas):
+        for (mu, log_var), (delta_mu, delta_log_var) in zip(
+            mu_log_vars, mu_log_var_deltas
+        ):
             if mu is not None:
                 kl_divergences.append(
                     delta_mu**2 / torch.exp(log_var)
