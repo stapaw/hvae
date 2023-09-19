@@ -218,7 +218,7 @@ class DCTHVAE(HVAE):
         self.decoder_input = MLP(
             dims=[
                 self.num_levels * self.latent_dim + self.num_classes,
-                self.hidden_dims,
+                self.num_hidden,
                 self.encoder_output_size,
             ]
         )
