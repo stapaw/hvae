@@ -209,7 +209,7 @@ class HVAE(VAE):
         zs = list(reversed(zs))
 
         for i in range(level):
-            zs[i][:] = 0  # torch.zeros_like(zs[i]).to(self.device)
+            zs[i][:] = torch.zeros_like(zs[i]).to(self.device)
 
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z = torch.cat([zs[level], y], dim=1)
