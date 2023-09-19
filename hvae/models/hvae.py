@@ -117,7 +117,7 @@ class HVAE(VAE):
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
         for i in range(level):
-            zs[i] = torch.zeros_like(zs[i])
+            zs[i] = torch.zeros_like(zs[i]).to(self.device)
 
         # concatenate all zs and a one-hot encoding of y
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
@@ -199,7 +199,7 @@ class HVAE(VAE):
         zs = list(reversed(zs))
 
         for i in range(level):
-            zs[i] = torch.zeros_like(zs[i])
+            zs[i] = torch.zeros_like(zs[i]).to(self.device)
 
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z = torch.cat([*zs, y], dim=1)
