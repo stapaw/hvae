@@ -177,7 +177,7 @@ class HVAE(VAE):
         }
 
     @torch.no_grad()
-    def sample(self, num_samples: int, y: Tensor = None, level: int = 0) -> Tensor:
+    def sample(self, num_samples: int, z: Tensor=None, y: Tensor = None, level: int = 0) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
             num_samples: Number of samples to generate
@@ -191,7 +191,9 @@ class HVAE(VAE):
         else:
             assert y.shape[0] == num_samples, "Invalid number of samples."
 
-        z = torch.randn(num_samples, self.latent_dim).to(self.device)
+        if z is None:
+            z = torch.randn(num_samples, self.latent_dim).to(self.device)
+
         zs = [z]
         for net in reversed(self.z_nets[:-1]):
             z = net(z)

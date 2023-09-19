@@ -65,8 +65,9 @@ class VisualizationCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         """Visualize model samples."""
+        z = torch.randn(12, self.latent_dim).to(pl_module.device)
         samples = [
-            pl_module.sample(10, level=level).detach().cpu().numpy()
+            pl_module.sample(12, z=z, level=level).detach().cpu().numpy()
             for level in range(pl_module.num_levels)
         ]
         images = draw_reconstructions(*samples)
