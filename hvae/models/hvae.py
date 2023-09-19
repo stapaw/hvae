@@ -95,9 +95,6 @@ class HVAE(VAE):
         assert level < self.num_levels, f"Invalid level: {level}."
 
         x = self.encoder(x).flatten(start_dim=1)
-        print("\n\n\n\n")
-        print(x.device, x.shape)
-        print("\n\n\n\n")
         rs = []
         for net in self.r_nets:
             x = net(x)
@@ -202,8 +199,9 @@ class HVAE(VAE):
         else:
             assert y.shape[0] == num_samples, "Invalid number of samples."
 
-        z = torch.randn(num_samples, self.latent_dim).to(self.device)
         zs = []
+        z = torch.randn(num_samples, self.latent_dim).to(self.device)
+        zs.append(z.clone())
         for net in reversed(self.z_nets[:-1]):
             z = net(z)
             mu, log_var = torch.chunk(z, 2, dim=1)
