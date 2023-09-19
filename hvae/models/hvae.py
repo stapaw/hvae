@@ -19,12 +19,14 @@ class HVAE(VAE):
         super().__init__(**kwargs)
         self.num_classes = num_classes
         self.num_levels = num_levels
+        self.num_hidden = 32
 
         self.r_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
                         self.encoder_output_size,
+                        self.num_hidden,
                         self.encoder_output_size,
                     ]
                 )
@@ -58,8 +60,7 @@ class HVAE(VAE):
 
         self.decoder_input = MLP(
             dims=[
-                (self.num_levels * self.latent_dim) + num_classes,
-                2 * self.num_levels * self.latent_dim,
+                (self.latent_dim) + num_classes,
                 self.encoder_output_size,
             ]
         )
@@ -99,12 +100,15 @@ class HVAE(VAE):
         rs = []
         for net in self.r_nets:
             x = net(x)
-            rs.append(x)
+            rs.append(x)  # TODO: deepcopy or assert to make sure it's different
+        # check if rs are not the same objects
+        assert all(r1 is not r2 for r1, r2 in zip(rs, rs[1:])), "rs are the same objects"
+
 
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
             delta_mu, delta_log_var = torch.chunk(net(r), 2, dim=1)
-            delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
+            delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
             mu_log_var_deltas.append((delta_mu, delta_log_var))
 
         zs = []
@@ -120,16 +124,18 @@ class HVAE(VAE):
                 mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
+            # TODO: check if z is NaN
             zs.append(z)
             previous_z = z
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
+
         for i in range(level):
-            zs[i] = torch.zeros_like(zs[i]).to(self.device)
+            zs[i][:] = 0
 
         # concatenate all zs and a one-hot encoding of y
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        z = torch.cat([*zs, y], dim=1)
+        z = torch.cat([zs[level], y], dim=1)
 
         # decode into the image space
         x_hat = self.decode(self.decoder_input(z))
