@@ -66,8 +66,8 @@ class VisualizationCallback(Callback):
     ) -> None:
         """Visualize model samples."""
         samples = [
-            pl_module.sample(10, level=i).detach().cpu().numpy()
-            for i in range(pl_module.num_levels)
+            pl_module.sample(10, level=level).detach().cpu().numpy()
+            for level in range(pl_module.num_levels)
         ]
         images = draw_reconstructions(*samples)
         pl_module.logger.log_image("train/samples", images=[images])
