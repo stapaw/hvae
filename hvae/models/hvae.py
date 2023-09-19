@@ -176,7 +176,7 @@ class HVAE(VAE):
                     0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
                 )
 
-        kld = sum(kld.sum(-1) for kld in klds)
+        kld = sum(klds).sum() / x.shape[0]
         loss = reconstruction_loss + self.beta * kld
 
         return {
