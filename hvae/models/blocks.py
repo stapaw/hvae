@@ -25,7 +25,7 @@ class Encoder(nn.Module):
                     in_channels,
                     kernel_size=3,
                     stride=1,
-                    padding='same',
+                    padding="same",
                 ),
                 activation(),
                 nn.Conv2d(
@@ -73,7 +73,7 @@ class Decoder(nn.Module):
                     in_channels,
                     kernel_size=3,
                     stride=1,
-                    padding='same',
+                    padding="same",
                 ),
                 activation(),
                 nn.ConvTranspose2d(
@@ -131,7 +131,7 @@ class MLP(nn.Module):
         self,
         dims: list[int],
         activation: Callable = nn.GELU,
-        last_activation: Callable = nn.Identity,
+        last_activation: Callable = nn.Sigmoid,
     ):
         super().__init__()
         modules = [
