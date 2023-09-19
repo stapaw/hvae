@@ -28,7 +28,8 @@ class HVAE(VAE):
                         self.encoder_output_size,
                         self.num_hidden,
                         self.encoder_output_size,
-                    ]
+                    ],
+                    last_activation=nn.Sigmoid,
                 )
                 for _ in range(self.num_levels)
             ]
@@ -92,11 +93,7 @@ class HVAE(VAE):
         rs = []
         for net in self.r_nets:
             x = net(x)
-            rs.append(x)  # TODO: deepcopy or assert to make sure it's different
-        # check if rs are not the same objects
-        assert all(
-            r1 is not r2 for r1, r2 in zip(rs, rs[1:])
-        ), "rs are the same objects"
+            rs.append(x)
 
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
@@ -122,14 +119,13 @@ class HVAE(VAE):
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
             assert not torch.isnan(z).any(), "z is NaN"
-            # TODO: check if z is NaN
             zs.append(z)
             previous_z = z
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
 
-        # for i in range(level):
-        #    zs[i][:] = 0
+        for i in range(level):
+            zs[i][:] = 0
 
         # concatenate a one-hot encoding of y
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
