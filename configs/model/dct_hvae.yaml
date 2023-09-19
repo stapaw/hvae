@@ -4,8 +4,8 @@ in_channels: ${dataset.num_channels}
 channels: [16, 32, 32, 64]
 latent_dim: 16
 beta: 0.5
-num_levels: 5
-ks: [64, 32, 16, 8, 4]
+num_levels: 2
+ks: [64, 16]
 lr: 0.001
 residual: false
 num_classes: ${dataset.num_classes}
