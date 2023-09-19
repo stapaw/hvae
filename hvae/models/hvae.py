@@ -60,7 +60,7 @@ class HVAE(VAE):
 
         self.decoder_input = MLP(
             dims=[
-                (self.latent_dim) + num_classes,
+                self.latent_dim + num_classes,
                 self.encoder_output_size,
             ]
         )
@@ -102,13 +102,14 @@ class HVAE(VAE):
             x = net(x)
             rs.append(x)  # TODO: deepcopy or assert to make sure it's different
         # check if rs are not the same objects
-        assert all(r1 is not r2 for r1, r2 in zip(rs, rs[1:])), "rs are the same objects"
-
+        assert all(
+            r1 is not r2 for r1, r2 in zip(rs, rs[1:])
+        ), "rs are the same objects"
 
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
             delta_mu, delta_log_var = torch.chunk(net(r), 2, dim=1)
-            delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
+            # delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
             mu_log_var_deltas.append((delta_mu, delta_log_var))
 
         zs = []
