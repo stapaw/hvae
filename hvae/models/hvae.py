@@ -124,15 +124,7 @@ class HVAE(VAE):
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
 
-        for i in range(level):
-            zs[i][:] = 0
-
-        # concatenate a one-hot encoding of y
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        z = torch.cat([zs[level], y], dim=1)
-
-        # decode into the image space
-        x_hat = self.decode(self.decoder_input(z))
+        x_hat = self.decode(self.before_decoder(zs, y, level=level))
 
         return {
             "x_hat": x_hat,
@@ -208,14 +200,13 @@ class HVAE(VAE):
             zs.append(z)
         zs = list(reversed(zs))
 
-        for i in range(level):
-            zs[i] = torch.zeros_like(zs[i]).to(self.device)
+        return self.decode(self.before_decoder(zs, y, level=level))
 
+    def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
+        """Concatenate the latent vectors with a one-hot encoding of y."""
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z = torch.cat([zs[level], y], dim=1)
         z = self.decoder_input(z)
-
-        return self.decode(z)
 
 
 class DCTHVAE(HVAE):
@@ -224,6 +215,13 @@ class DCTHVAE(HVAE):
     def __init__(self, ks: list[int], **kwargs):
         super().__init__(num_levels=len(ks), **kwargs)
         self.ks = ks
+        self.decoder_input = MLP(
+            dims=[
+                self.num_levels * self.latent_dim + self.num_classes,
+                self.hidden_dims,
+                self.encoder_output_size,
+            ]
+        )
 
     def step(self, batch):
         x, y = batch
@@ -235,3 +233,11 @@ class DCTHVAE(HVAE):
             losses.append(self.loss_function(**outputs))
         loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
         return loss, outputs["x_hat"]
+
+    def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
+        """Concatenate the latent vectors together and add a one-hot encoding of y."""
+        for i in range(level):
+            zs[i] = torch.zeros_like(zs[i]).to(self.device)
+        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        z = torch.cat([*zs, y], dim=1)
+        return self.decoder_input(z)
