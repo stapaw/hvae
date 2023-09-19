@@ -88,13 +88,10 @@ class HVAE(VAE):
 
         x = self.encoder(x).flatten(start_dim=1)
         print("\n\n\n\n")
-        print(x.device)
+        print(x.device, x.shape)
         print("\n\n\n\n")
         rs = []
         for net in self.r_nets:
-            print("\n\n\n\n")
-            print(net.device)
-            print("\n\n\n\n")
             x = net(x)
             rs.append(x.clone())
 
