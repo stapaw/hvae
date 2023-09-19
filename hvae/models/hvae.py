@@ -103,8 +103,7 @@ class HVAE(VAE):
 
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
-            delta = net(r)
-            delta_mu, delta_log_var = torch.chunk(delta, 2, dim=1)
+            delta_mu, delta_log_var = torch.chunk(net(r), 2, dim=1)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)
             mu_log_var_deltas.append((delta_mu, delta_log_var))
 
