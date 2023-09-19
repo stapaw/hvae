@@ -227,10 +227,8 @@ class DCTHVAE(HVAE):
 
     def __init__(self, ks: list[int], **kwargs):
         super().__init__(**kwargs)
-        assert (
-            len(ks) == self.num_levels
-        ), f"Invalid length: ks should have {self.num_levels} elements."
         self.ks = ks
+        self.num_levels = len(ks)
 
     def step(self, batch):
         x, y = batch
