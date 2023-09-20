@@ -41,7 +41,6 @@ class HVAE(VAE):
                         self.encoder_output_size,
                         2 * self.latent_dim,
                     ],
-                    last_activation=nn.Sigmoid
                 )
                 for _ in range(self.num_levels)
             ]
@@ -263,7 +262,7 @@ class DCTHVAE(HVAE):
         Returns:
             Dictionary containing the loss value and the individual losses
         """
-        reconstruction_loss = reconstruction_scale * F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
+        reconstruction_loss = reconstruction_scale * F.mse_loss(x_hat, x, reduction="sum")
 
         klds = []
         for (mu, log_var), (delta_mu, delta_log_var) in zip(
@@ -281,7 +280,7 @@ class DCTHVAE(HVAE):
                     0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
                 )
 
-        kld = reconstruction_scale * sum(klds).sum() / x.shape[0]
+        kld = reconstruction_scale * sum(klds).sum()
         loss = reconstruction_loss + self.beta * kld
 
         return {
