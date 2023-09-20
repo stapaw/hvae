@@ -46,7 +46,7 @@ def get_dataloaders(cfg: DictConfig):
     root = Path(hydra.utils.get_original_cwd()) / Path(cfg.dataset.root)
     if cfg.dataset.name != "cifar10":
         raise ValueError(f"Invalid dataset name: {cfg.dataset.name}.")
-    dct_mask_transform = DCTMaskTransform(16, get_mask, (1, 32, 32))
+    # dct_mask_transform = DCTMaskTransform(16, get_mask, (1, 32, 32))
     dataset = torchvision.datasets.CIFAR10(
         root=root,
         train=True,

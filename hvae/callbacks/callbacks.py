@@ -45,9 +45,9 @@ class VisualizationCallback(Callback):
         is_training = pl_module.training
         pl_module.eval()
         x, y = batch
-        _, x_hat = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
+        _, x_hats = pl_module.step((x.to(pl_module.device), y.to(pl_module.device)))
         images = draw_reconstructions(
-            x.detach().cpu().numpy(), x_hat.detach().cpu().numpy()
+            x.detach().cpu().numpy(), *(x_hat.detach().cpu().numpy() for x_hat in x_hats)
         )
         pl_module.logger.log_image(f"{stage}/reconstructions", images=[images])
 
@@ -66,8 +66,9 @@ class VisualizationCallback(Callback):
     ) -> None:
         """Visualize model samples."""
         z = pl_module.generate_noise(num_samples=12)
+        y = torch.randint(pl_module.num_classes, size=(12,)).to(pl_module.device)
         samples = [
-            pl_module.sample(12, z=z, level=level).detach().cpu().numpy()
+            pl_module.sample(12, z=z, level=level, y=y).detach().cpu().numpy()
             for level in range(pl_module.num_levels)
         ]
         images = draw_reconstructions(*samples)
