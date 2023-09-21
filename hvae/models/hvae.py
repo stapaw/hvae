@@ -78,7 +78,7 @@ class HVAE(VAE):
         outputs = self.forward(x, y)
         outputs["x"] = x
         loss = self.loss_function(**outputs)
-        return loss, outputs["x_hat"]
+        return loss, [outputs["x_hat"]]
 
     def forward(self, x: Tensor, y: Tensor, level: int = 0) -> list[Tensor]:
         """Perform the forward pass.
@@ -244,51 +244,6 @@ class DCTHVAE(HVAE):
             level_x_hat.append(outputs["x_hat"])
         loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
         return loss, level_x_hat
-
-    def loss_function(
-        self,
-        x: Tensor,
-        x_hat: Tensor,
-        mu_log_vars: list[Tensor],
-        mu_log_var_deltas: list[Tensor],
-        reconstruction_scale=1
-    ) -> dict:
-        """Compute the loss given ground truth images and their reconstructions.
-        Args:
-            x: Ground truth images of shape (B x C x H x W)
-            x_hat: Reconstructed images of shape (B x C x H x W)
-            mu: Latent mean of shape (B x D)
-            log_var: Latent log variance of shape (B x D)
-            kld_weight: Weight for the Kullback-Leibler divergence term
-        Returns:
-            Dictionary containing the loss value and the individual losses
-        """
-        reconstruction_loss = reconstruction_scale * F.mse_loss(x_hat, x, reduction="sum")
-
-        klds = []
-        for (mu, log_var), (delta_mu, delta_log_var) in zip(
-            mu_log_vars, mu_log_var_deltas
-        ):
-            if mu is not None:
-                klds.append(
-                    0.5 * delta_mu**2 / torch.exp(log_var)
-                    + torch.exp(delta_log_var)
-                    - delta_log_var
-                    - 1
-                )
-            else:
-                klds.append(
-                    0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
-                )
-
-        kld = reconstruction_scale * sum(klds).sum()
-        loss = reconstruction_loss + self.beta * kld
-
-        return {
-            "loss": loss,
-            "reconstruction_loss": reconstruction_loss,
-            "kl_divergence": kld,
-        }
 
     def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
         """Concatenate the latent vectors together and add a one-hot encoding of y."""
