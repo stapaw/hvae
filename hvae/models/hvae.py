@@ -149,7 +149,7 @@ class HVAE(VAE):
         Returns:
             Dictionary containing the loss value and the individual losses
         """
-        reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
+        reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum")
 
         klds = []
         for (mu, log_var), (delta_mu, delta_log_var) in zip(
@@ -167,7 +167,7 @@ class HVAE(VAE):
                     0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
                 )
 
-        kld = sum(klds).sum() / x.shape[0]
+        kld = sum(klds).sum()
         loss = reconstruction_loss + self.beta * kld
 
         return {
