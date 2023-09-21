@@ -19,17 +19,17 @@ class HVAE(VAE):
         super().__init__(**kwargs)
         self.num_classes = num_classes
         self.num_levels = num_levels
-        self.num_hidden = 32
+        self.num_hidden = 128
 
         self.r_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
                         self.encoder_output_size,
-                        self.num_hidden,
+                        # self.num_hidden,
                         self.encoder_output_size,
                     ],
-                    last_activation=nn.Sigmoid,
+                    # last_activation=nn.Sigmoid,
                 )
                 for _ in range(self.num_levels)
             ]
@@ -38,7 +38,7 @@ class HVAE(VAE):
             [
                 MLP(
                     dims=[
-                        self.encoder_output_size,
+                        self.encoder_output_size + self.num_classes,
                         2 * self.latent_dim,
                     ],
                 )
@@ -50,7 +50,7 @@ class HVAE(VAE):
             [
                 MLP(
                     dims=[
-                        self.latent_dim,
+                        self.latent_dim + self.num_classes,
                         2 * self.latent_dim,
                     ]
                 )
@@ -94,10 +94,10 @@ class HVAE(VAE):
         for net in self.r_nets:
             x = net(x)
             rs.append(x)
-
+        y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         mu_log_var_deltas = []
         for r, net in zip(rs, self.delta_nets):
-            delta_mu, delta_log_var = torch.chunk(net(r), 2, dim=1)
+            delta_mu, delta_log_var = torch.chunk(net(torch.cat([r, y_one_hot], dim=1)), 2, dim=1)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
             mu_log_var_deltas.append((delta_mu, delta_log_var))
 
@@ -113,7 +113,7 @@ class HVAE(VAE):
                 mu_log_vars.append((None, None))
                 z = self.reparameterize(delta_mu, delta_log_var)
             else:
-                mu, log_var = torch.chunk(net(previous_z), 2, dim=1)
+                mu, log_var = torch.chunk(net(torch.cat([previous_z, y_one_hot], dim=1)), 2, dim=1)
                 assert not torch.isnan(mu).any(), "mu is NaN"
                 assert not torch.isnan(log_var).any(), "log_var is NaN"
                 mu_log_vars.append((mu, log_var))
@@ -197,8 +197,9 @@ class HVAE(VAE):
             z = torch.randn(num_samples, self.latent_dim).to(self.device)
 
         zs = [z]
+        y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         for net in reversed(self.z_nets[:-1]):
-            z = net(z)
+            z = net(torch.cat([z, y_one_hot], dim=1))
             mu, log_var = torch.chunk(z, 2, dim=1)
             z = self.reparameterize(mu, log_var)
             zs.append(z)
@@ -210,7 +211,7 @@ class HVAE(VAE):
         """Concatenate the latent vectors with a one-hot encoding of y."""
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         z = torch.cat([zs[level], y], dim=1)
-        z = self.decoder_input(z)
+        return self.decoder_input(z)
 
     def generate_noise(self, num_samples: int) -> Tensor:
         """Generate a noise tensor to use for sampling."""
@@ -225,8 +226,8 @@ class DCTHVAE(HVAE):
         self.ks = ks
         self.decoder_input = MLP(
             dims=[
-                self.num_levels * self.latent_dim + self.num_classes,
-                self.num_hidden,
+                self.latent_dim + self.num_classes + self.num_levels,
+                # self.num_hidden,
                 self.encoder_output_size,
             ]
         )
@@ -239,9 +240,9 @@ class DCTHVAE(HVAE):
             x_dct = reconstruct_dct(x, k=k).to(self.device)
             outputs = self.forward(x_dct, y, level=level)
             outputs["x"] = x_dct
-            losses.append(self.loss_function(**outputs, reconstruction_scale=len(self.ks)-level))
+            losses.append(self.loss_function(**outputs))
             level_x_hat.append(outputs["x_hat"])
-        loss = {k: sum(loss[k] for loss in losses)/(len(self.ks)*(len(self.ks)+1)/2) for k in losses[0].keys()}
+        loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
         return loss, level_x_hat
 
     def loss_function(
@@ -291,8 +292,10 @@ class DCTHVAE(HVAE):
 
     def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
         """Concatenate the latent vectors together and add a one-hot encoding of y."""
-        for i in range(level):
-            zs[i] = torch.zeros_like(zs[i]).to(self.device)
+        # for i in range(level):
+        #     zs[i] = torch.zeros_like(zs[i]).to(self.device)
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        z = torch.cat([*zs, y], dim=1)
+        lvl = F.one_hot(torch.tensor([level]*y.shape[0]), num_classes=self.num_levels).float().to(self.device)
+        z = torch.cat([zs[level], y], dim=1)
+        z = torch.cat([z, lvl], dim=1)
         return self.decoder_input(z)
