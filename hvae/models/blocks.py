@@ -56,7 +56,7 @@ class Decoder(nn.Module):
         channels: list[int],
         out_channels: int = 1,
         activation: Callable = nn.GELU,
-        last_activation: Callable = nn.Sigmoid,
+        last_activation: Callable = nn.Identity,
     ) -> None:
         """Initialize the decoder.
         Args:
