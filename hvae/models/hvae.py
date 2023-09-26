@@ -133,11 +133,11 @@ class HVAE(VAE):
         }
 
     def loss_function(
-        self,
-        x: Tensor,
-        x_hat: Tensor,
-        mu_log_vars: list[Tensor],
-        mu_log_var_deltas: list[Tensor],
+            self,
+            x: Tensor,
+            x_hat: Tensor,
+            mu_log_vars: list[Tensor],
+            mu_log_var_deltas: list[Tensor],
     ) -> dict:
         """Compute the loss given ground truth images and their reconstructions.
         Args:
@@ -149,36 +149,60 @@ class HVAE(VAE):
         Returns:
             Dictionary containing the loss value and the individual losses
         """
-        reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum")
+        delta_mu_max, delta_mu_min, delta_mu_mean = torch.max(mu_log_var_deltas[-1][0]), \
+                                                    torch.min(mu_log_var_deltas[-1][0]), torch.mean(
+            mu_log_var_deltas[-1][0])
+        delta_log_max, delta_log_min, delta_log_mean = torch.max(mu_log_var_deltas[-1][1]), torch.min(
+            mu_log_var_deltas[-1][1]), torch.mean(mu_log_var_deltas[-1][1])
+
+        mu_max, mu_min, mu_mean = torch.max(mu_log_vars[-2][0]), \
+                                                    torch.min(mu_log_vars[-2][0]), torch.mean(
+            mu_log_vars[-2][0])
+        log_max, log_min, log_mean = torch.max(mu_log_vars[-2][1]), torch.min(
+            mu_log_vars[-2][1]), torch.mean(mu_log_vars[-2][1])
+
+        reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
         klds = []
         for (mu, log_var), (delta_mu, delta_log_var) in zip(
-            mu_log_vars, mu_log_var_deltas
+                mu_log_vars, mu_log_var_deltas
         ):
             if mu is not None:
                 klds.append(
-                    0.5 * delta_mu**2 / torch.exp(log_var)
+                    0.5 * delta_mu ** 2 / torch.exp(log_var)
                     + torch.exp(delta_log_var)
                     - delta_log_var
                     - 1
                 )
             else:
                 klds.append(
-                    0.5 * delta_mu**2 + torch.exp(delta_log_var) - delta_log_var - 1
+                    0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1
                 )
 
-        kld = sum(klds).sum()
+        kld = sum(klds).sum() / x.shape[0]
         loss = reconstruction_loss + self.beta * kld
 
         return {
             "loss": loss,
             "reconstruction_loss": reconstruction_loss,
             "kl_divergence": kld,
+            "delta_mu_max": delta_mu_max,
+            "delta_mu_min": delta_mu_min,
+            "delta_mu_mean": delta_mu_mean,
+            "delta_log_max": delta_log_max,
+            "delta_log_min": delta_log_min,
+            "delta_log_mean": delta_log_mean,
+            "mu_max": mu_max,
+            "mu_min": mu_min,
+            "mu_mean": mu_mean,
+            "log_max": log_max,
+            "log_min": log_min,
+            "log_mean": log_mean
         }
 
     @torch.no_grad()
     def sample(
-        self, num_samples: int, z: Tensor = None, y: Tensor = None, level: int = 0
+            self, num_samples: int, z: Tensor = None, y: Tensor = None, level: int = 0
     ) -> Tensor:
         """Sample a vector in the latent space and return the corresponding image.
         Args:
@@ -240,17 +264,62 @@ class DCTHVAE(HVAE):
             x_dct = reconstruct_dct(x, k=k).to(self.device)
             outputs = self.forward(x_dct, y, level=level)
             outputs["x"] = x_dct
-            losses.append(self.loss_function(**outputs))
+            losses.append(self.loss_function(**outputs, reconstruction_scale=len(self.ks) - level))
             level_x_hat.append(outputs["x_hat"])
-        loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
+        loss = {k: sum(loss[k] for loss in losses) / (len(self.ks) * (len(self.ks) + 1) / 2) for k in losses[0].keys()}
         return loss, level_x_hat
+
+    def loss_function(
+            self,
+            x: Tensor,
+            x_hat: Tensor,
+            mu_log_vars: list[Tensor],
+            mu_log_var_deltas: list[Tensor],
+            reconstruction_scale=1
+    ) -> dict:
+        """Compute the loss given ground truth images and their reconstructions.
+        Args:
+            x: Ground truth images of shape (B x C x H x W)
+            x_hat: Reconstructed images of shape (B x C x H x W)
+            mu: Latent mean of shape (B x D)
+            log_var: Latent log variance of shape (B x D)
+            kld_weight: Weight for the Kullback-Leibler divergence term
+        Returns:
+            Dictionary containing the loss value and the individual losses
+        """
+        reconstruction_loss = reconstruction_scale * F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
+
+        klds = []
+        for (mu, log_var), (delta_mu, delta_log_var) in zip(
+                mu_log_vars, mu_log_var_deltas
+        ):
+            if mu is not None:
+                klds.append(
+                    0.5 * delta_mu ** 2 / torch.exp(log_var)
+                    + torch.exp(delta_log_var)
+                    - delta_log_var
+                    - 1
+                )
+            else:
+                klds.append(
+                    0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1
+                )
+
+        kld = reconstruction_scale * sum(klds).sum() / x.shape[0]
+        loss = reconstruction_loss + self.beta * kld
+
+        return {
+            "loss": loss,
+            "reconstruction_loss": reconstruction_loss,
+            "kl_divergence": kld,
+        }
 
     def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
         """Concatenate the latent vectors together and add a one-hot encoding of y."""
         # for i in range(level):
         #     zs[i] = torch.zeros_like(zs[i]).to(self.device)
         y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        lvl = F.one_hot(torch.tensor([level]*y.shape[0]), num_classes=self.num_levels).float().to(self.device)
+        lvl = F.one_hot(torch.tensor([level] * y.shape[0]), num_classes=self.num_levels).float().to(self.device)
         z = torch.cat([zs[level], y], dim=1)
         z = torch.cat([z, lvl], dim=1)
         return self.decoder_input(z)
