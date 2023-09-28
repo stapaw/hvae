@@ -12,6 +12,21 @@ from hvae.models.blocks import MLP
 from hvae.utils.dct import reconstruct_dct
 
 
+class ModifiedSigmoid(nn.Module):
+    def forward(self, input: Tensor) -> Tensor:
+        return torch.multiply(torch.sigmoid(input), 30).add(-15)
+
+
+class ModifiedSigmoidLogVar(nn.Module):
+    def forward(self, input: Tensor) -> Tensor:
+        return torch.multiply(torch.sigmoid(input), 3).add(-2)
+
+
+class ModifiedSigmoidZ(nn.Module):
+    def forward(self, input: Tensor) -> Tensor:
+        return torch.multiply(torch.sigmoid(input), 30).add(-15)
+
+
 class HVAE(VAE):
     """Conditional hierarchical VAE"""
 
@@ -39,20 +54,52 @@ class HVAE(VAE):
                 MLP(
                     dims=[
                         self.encoder_output_size + self.num_classes,
+                        # self.num_hidden,
                         2 * self.latent_dim,
                     ],
+                    # activation=ModifiedSigmoid,
                 )
                 for _ in range(self.num_levels)
             ]
         )
 
+        self.h_net = MLP(dims=[2 * self.latent_dim,
+                               2 * self.latent_dim],
+                         )
+        # self.delta_nets_mu = nn.ModuleList(
+        #     [
+        #         MLP(
+        #             dims=[
+        #                 self.latent_dim,
+        #                 self.latent_dim
+        #             ],
+        #             last_activation=ModifiedSigmoid,
+        #         )
+        #         for _ in range(self.num_levels)
+        #     ]
+        # )
+        #
+        # self.delta_nets_log_var = nn.ModuleList(
+        #     [
+        #         MLP(
+        #             dims=[
+        #                 self.latent_dim,
+        #                 self.latent_dim,
+        #             ],
+        #             last_activation=ModifiedSigmoidLogVar,
+        #         )
+        #         for _ in range(self.num_levels)
+        #     ]
+        # )
+
         self.z_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
-                        self.latent_dim + self.num_classes,
+                        3 * self.latent_dim + self.num_classes,
                         2 * self.latent_dim,
-                    ]
+                    ],
+                    # last_activation=ModifiedSigmoidZ
                 )
                 for _ in range(self.num_levels - 1)
             ]
@@ -61,7 +108,8 @@ class HVAE(VAE):
 
         self.decoder_input = MLP(
             dims=[
-                self.latent_dim + num_classes,
+                3 * self.latent_dim + num_classes,
+                # self.num_hidden,
                 self.encoder_output_size,
             ]
         )
@@ -96,31 +144,40 @@ class HVAE(VAE):
             rs.append(x)
         y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
         mu_log_var_deltas = []
-        for r, net in zip(rs, self.delta_nets):
+        for i, (r, net) in enumerate(zip(rs, self.delta_nets)):
             delta_mu, delta_log_var = torch.chunk(net(torch.cat([r, y_one_hot], dim=1)), 2, dim=1)
+            # delta_mu = self.delta_nets_mu[i](delta_mu)
+            # delta_log_var = self.delta_nets_log_var[i](delta_log_var)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
             mu_log_var_deltas.append((delta_mu, delta_log_var))
 
         zs = []
         mu_log_vars = []
         previous_z = None
+        previous_h = None
         for (delta_mu, delta_log_var), net in zip(
-            reversed(mu_log_var_deltas), reversed(self.z_nets)
+                reversed(mu_log_var_deltas), reversed(self.z_nets)
         ):
             assert not torch.isnan(delta_mu).any(), "delta_mu is NaN"
             assert not torch.isnan(delta_log_var).any(), "delta_log_var is NaN"
             if previous_z is None:
                 mu_log_vars.append((None, None))
                 z = self.reparameterize(delta_mu, delta_log_var)
+                h = self.h_net(torch.ones([z.shape[0], 2*self.latent_dim]).to(self.device))
             else:
-                mu, log_var = torch.chunk(net(torch.cat([previous_z, y_one_hot], dim=1)), 2, dim=1)
+                h = net(torch.cat([previous_z, previous_h, y_one_hot], dim=1))
+                assert torch.cat([previous_z, previous_h, y_one_hot], dim=1).shape[1] == 3*self.latent_dim + self.num_classes
+                mu, log_var = torch.chunk(h, 2, dim=1)
                 assert not torch.isnan(mu).any(), "mu is NaN"
                 assert not torch.isnan(log_var).any(), "log_var is NaN"
                 mu_log_vars.append((mu, log_var))
                 z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
             assert not torch.isnan(z).any(), "z is NaN"
-            zs.append(z)
             previous_z = z
+            previous_h = h
+            z_h = torch.cat([z, h], dim=1)
+            assert z_h.shape[1] == 3*self.latent_dim
+            zs.append(z_h)
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
 
@@ -156,7 +213,7 @@ class HVAE(VAE):
             mu_log_var_deltas[-1][1]), torch.mean(mu_log_var_deltas[-1][1])
 
         mu_max, mu_min, mu_mean = torch.max(mu_log_vars[-2][0]), \
-                                                    torch.min(mu_log_vars[-2][0]), torch.mean(
+                                  torch.min(mu_log_vars[-2][0]), torch.mean(
             mu_log_vars[-2][0])
         log_max, log_min, log_mean = torch.max(mu_log_vars[-2][1]), torch.min(
             mu_log_vars[-2][1]), torch.mean(mu_log_vars[-2][1])
@@ -220,13 +277,16 @@ class HVAE(VAE):
         if z is None:
             z = torch.randn(num_samples, self.latent_dim).to(self.device)
 
-        zs = [z]
+        h = self.h_net(torch.ones([num_samples, 2*self.latent_dim]).to(self.device))
+        z_h = torch.cat([z, h], dim=1)
+        zs = [z_h]
         y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
-        for net in reversed(self.z_nets[:-1]):
-            z = net(torch.cat([z, y_one_hot], dim=1))
-            mu, log_var = torch.chunk(z, 2, dim=1)
+        for i, net in enumerate(reversed(self.z_nets[:-1])):
+            h = net(torch.cat([z, h, y_one_hot], dim=1))
+            mu, log_var = torch.chunk(h, 2, dim=1)
             z = self.reparameterize(mu, log_var)
-            zs.append(z)
+            z_h = torch.cat([z, h], dim=1)
+            zs.append(z_h)
         zs = list(reversed(zs))
 
         return self.decode(self.before_decoder(zs, y, level=level))
@@ -250,7 +310,7 @@ class DCTHVAE(HVAE):
         self.ks = ks
         self.decoder_input = MLP(
             dims=[
-                self.latent_dim + self.num_classes + self.num_levels,
+                3* self.latent_dim + self.num_classes + self.num_levels,
                 # self.num_hidden,
                 self.encoder_output_size,
             ]

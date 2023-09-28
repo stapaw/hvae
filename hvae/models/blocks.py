@@ -35,7 +35,7 @@ class Encoder(nn.Module):
                     stride=2,
                     padding=1,
                 ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, track_running_stats=False),
                 activation(),
             )
             for in_channels, out_channels in zip(channels[:-1], channels[1:])
@@ -84,7 +84,7 @@ class Decoder(nn.Module):
                     padding=1,
                     output_padding=1,
                 ),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, track_running_stats=False),
                 activation(),
             )
             for in_channels, out_channels in zip(channels[:-1], channels[1:])
@@ -135,7 +135,7 @@ class MLP(nn.Module):
     ):
         super().__init__()
         modules = [
-            nn.Sequential(nn.Linear(n_in, n_out), activation(), nn.BatchNorm1d(n_out))
+            nn.Sequential(nn.Linear(n_in, n_out), activation(), nn.BatchNorm1d(n_out, track_running_stats=False))
             for n_in, n_out in zip(dims[:-2], dims[1:-1])
         ]
         modules.append(nn.Sequential(nn.Linear(dims[-2], dims[-1]), last_activation()))
