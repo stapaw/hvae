@@ -35,7 +35,8 @@ def draw_batch(
         axes = np.array([axes])
 
     for ax, img in zip(axes.flat, images[:num_images]):
-        ax.imshow(img, cmap="Greys_r", interpolation="nearest")
+        img = img / np.amax(img)
+        ax.imshow(img, cmap="Greys_r", interpolation="nearest", vmin=0, vmax=1)
         ax.axis("off")
     buffer = io.BytesIO()
     plt.savefig(buffer, bbox_inches="tight")
@@ -80,14 +81,15 @@ def draw_reconstructions(
     for i, ax in enumerate(axes.flat):
         if i >= num_images:
             break
-        images = [img[i] for img in image_arrays]
+        images = [(img[i] - np.amin(img[i]))/ (np.amax(img[i]) - np.amin(img[i])) for img in image_arrays]
         concatenated = np.concatenate(images, axis=1)
         border_width = concatenated.shape[1] // 128 or 1
 
         for j in range(1, len(image_arrays)):
             mid = j * concatenated.shape[1] // len(image_arrays)
             concatenated[:, mid - border_width : mid + border_width] = 1.0
-        ax.imshow(concatenated, cmap="Greys_r", interpolation="nearest")
+
+        ax.imshow(concatenated, cmap="Greys_r", interpolation="nearest", vmin=0, vmax=1)
 
     buffer = io.BytesIO()
     plt.savefig(buffer, bbox_inches="tight")
