@@ -67,18 +67,6 @@ def get_dataloaders(cfg: DictConfig):
         root=root,
         train=True,
         download=True,
-        # transform=
-        # transforms.Compose(
-        #     [
-        #     transforms.RandomCrop(32, padding=4),
-        #     transforms.RandomHorizontalFlip(),
-        #     transforms.ToTensor(),
-        #     transforms.Normalize(
-        #         (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-        #     ),
-        #     # dct_mask_transform
-        #     ]
-        # )
     )
     # filter out everything except desired class
     if cfg.dataset.classes is not None:

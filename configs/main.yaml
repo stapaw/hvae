@@ -13,7 +13,7 @@ trainer:
   enable_checkpointing: false
   enable_progress_bar: false
 #  gradient_clip_val: 0.5
-  log_every_n_steps: 10
+  log_every_n_steps: 100
   logger: ${wandb}
   max_epochs: 3000
 
