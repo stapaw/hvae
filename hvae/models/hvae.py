@@ -151,7 +151,7 @@ class HVAE(VAE):
                 h = self.h_net(torch.ones([z.shape[0], 2*self.latent_dim]).to(self.device))
             else:
                 h = net(torch.cat([previous_z, previous_h], dim=1))
-                assert torch.cat([previous_z, previous_h], dim=1).shape[1] == 3*self.latent_dim + self.num_classes
+                assert torch.cat([previous_z, previous_h], dim=1).shape[1] == 3*self.latent_dim
                 mu, log_var = torch.chunk(h, 2, dim=1)
                 assert not torch.isnan(mu).any(), "mu is NaN"
                 assert not torch.isnan(log_var).any(), "log_var is NaN"
