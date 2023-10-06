@@ -15,7 +15,7 @@ trainer:
 #  gradient_clip_val: 0.5
   log_every_n_steps: 100
   logger: ${wandb}
-  max_epochs: 3000
+  max_epochs: 500
 
 training:
   batch_size: 256
@@ -27,6 +27,7 @@ wandb:
   project: hvae
   save_dir: outputs/wandb
   mode: online
+  tags: null
   group: null
   notes: null
   name: null

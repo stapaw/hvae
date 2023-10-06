@@ -57,11 +57,11 @@ class VAE(pl.LightningModule):
                 self.encoder_output_img_size > 0
             ), "Too many layers for the input size."
             self.encoder_output_size = self.encoder_output_img_size**2 * channels[-1]
+            self.encoder_output_sizes = [(img_size // (2 ** (i+1)))**2 * channels[i] for i in range(len(channels))]
 
         self.fc_mu = nn.Linear(self.encoder_output_size, latent_dim)
         self.fc_var = nn.Linear(self.encoder_output_size, latent_dim)
         self.decoder_input = nn.Linear(latent_dim, self.encoder_output_size)
-
     def configure_optimizers(self):
         """Configure the optimizers."""
         return torch.optim.Adam(

@@ -25,63 +25,38 @@ class HVAE(VAE):
             [
                 MLP(
                     dims=[
-                        self.encoder_output_size,
+                        self.encoder_output_sizes[i],
                         # self.num_hidden,
-                        self.encoder_output_size,
+                        self.encoder_output_sizes[i] //4,
                     ],
                     # last_activation=nn.Sigmoid,
                 )
-                for _ in range(self.num_levels)
+                for i in range(self.num_levels)
             ]
         )
         self.delta_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
-                        self.encoder_output_size,
+                        self.encoder_output_sizes[i] // 4 + self.num_classes + 1,
                         # self.num_hidden,
                         2 * self.latent_dim,
                     ],
                     # activation=ModifiedSigmoid,
                 )
-                for _ in range(self.num_levels)
+                for i in range(self.num_levels)
             ]
         )
 
-        self.h_net = MLP(dims=[2 * self.latent_dim,
+        self.h_net = MLP(dims=[2 * self.latent_dim + self.num_classes + 1,
                                2 * self.latent_dim],
                          )
-        # self.delta_nets_mu = nn.ModuleList(
-        #     [
-        #         MLP(
-        #             dims=[
-        #                 self.latent_dim,
-        #                 self.latent_dim
-        #             ],
-        #             last_activation=ModifiedSigmoid,
-        #         )
-        #         for _ in range(self.num_levels)
-        #     ]
-        # )
-        #
-        # self.delta_nets_log_var = nn.ModuleList(
-        #     [
-        #         MLP(
-        #             dims=[
-        #                 self.latent_dim,
-        #                 self.latent_dim,
-        #             ],
-        #             last_activation=ModifiedSigmoidLogVar,
-        #         )
-        #         for _ in range(self.num_levels)
-        #     ]
-        # )
 
         self.z_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
-                        3 * self.latent_dim,
+                        3 * self.latent_dim + self.num_classes + 1,
                         2 * self.latent_dim,
                     ],
                     # last_activation=ModifiedSigmoidZ
@@ -93,7 +68,7 @@ class HVAE(VAE):
 
         self.decoder_input = MLP(
             dims=[
-                3 * self.latent_dim + num_classes,
+                3 * self.latent_dim + num_classes + 1,
                 # self.num_hidden,
                 self.encoder_output_size,
             ]
@@ -113,7 +88,7 @@ class HVAE(VAE):
         loss = self.loss_function(**outputs)
         return loss, [outputs["x_hat"]]
 
-    def forward(self, x: Tensor, y: Tensor, level: int = 0) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor, level: int = 0, no_label_prob: float = 0.01) -> list[Tensor]:
         """Perform the forward pass.
         Args:
             x: Input tensor of shape (B x C x H x W)
@@ -122,15 +97,23 @@ class HVAE(VAE):
         """
         assert level < self.num_levels, f"Invalid level: {level}."
 
-        x = self.encoder(x).flatten(start_dim=1)
+        # x = self.encoder(x).flatten(start_dim=1)
+        xs = []
+        for i in range(self.num_levels):
+            x = self.encoder.encoder[i:i + 1](x)#.flatten(start_dim=1)
+            xs.append(x)#.flatten(start_dim=1)
+
         rs = []
-        for net in self.r_nets:
-            x = net(x)
+        for i, net in enumerate(self.r_nets):
+            x = net(xs[i].flatten(start_dim=1))
             rs.append(x)
-        # y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+
+        mask = torch.rand(y.shape) < no_label_prob
+        y[mask] = self.num_classes
+        y_one_hot = F.one_hot(y, num_classes=self.num_classes + 1).float().to(self.device)
         mu_log_var_deltas = []
         for i, (r, net) in enumerate(zip(rs[level:], self.delta_nets[level:])):
-            delta_mu, delta_log_var = torch.chunk(net(torch.cat([r], dim=1)), 2, dim=1)
+            delta_mu, delta_log_var = torch.chunk(net(torch.cat([r, y_one_hot], dim=1)), 2, dim=1)
             # delta_mu = self.delta_nets_mu[i](delta_mu)
             # delta_log_var = self.delta_nets_log_var[i](delta_log_var)
             delta_log_var = F.hardtanh(delta_log_var, -7.0, 2.0)  # TODO: remove?
@@ -148,10 +131,12 @@ class HVAE(VAE):
             if previous_z is None:
                 mu_log_vars.append((None, None))
                 z = self.reparameterize(delta_mu, delta_log_var)
-                h = self.h_net(torch.ones([z.shape[0], 2*self.latent_dim]).to(self.device))
+                h = self.h_net(
+                    torch.cat([torch.ones([z.shape[0], 2 * self.latent_dim]).to(self.device), y_one_hot], dim=1).to(
+                        self.device))
             else:
-                h = net(torch.cat([previous_z, previous_h], dim=1))
-                assert torch.cat([previous_z, previous_h], dim=1).shape[1] == 3*self.latent_dim
+                h = net(torch.cat([previous_z, previous_h, y_one_hot], dim=1))
+                assert torch.cat([previous_z, previous_h], dim=1).shape[1] == 3 * self.latent_dim
                 mu, log_var = torch.chunk(h, 2, dim=1)
                 assert not torch.isnan(mu).any(), "mu is NaN"
                 assert not torch.isnan(log_var).any(), "log_var is NaN"
@@ -161,7 +146,7 @@ class HVAE(VAE):
             previous_z = z
             previous_h = h
             z_h = torch.cat([z, h], dim=1)
-            assert z_h.shape[1] == 3*self.latent_dim
+            assert z_h.shape[1] == 3 * self.latent_dim
             zs.append(z_h)
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
@@ -262,12 +247,14 @@ class HVAE(VAE):
         if z is None:
             z = torch.randn(num_samples, self.latent_dim).to(self.device)
 
-        h = self.h_net(torch.ones([num_samples, 2*self.latent_dim]).to(self.device))
+        y_one_hot = F.one_hot(y, num_classes=self.num_classes + 1).float().to(self.device)
+        h = self.h_net(torch.cat([torch.ones([z.shape[0], 2 * self.latent_dim]).to(self.device), y_one_hot], dim=1).to(
+            self.device))
         z_h = torch.cat([z, h], dim=1)
         zs = [z_h]
-        # y_one_hot = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+
         for i, net in enumerate(reversed(self.z_nets[level:-1])):
-            h = net(torch.cat([z, h], dim=1))
+            h = net(torch.cat([z, h, y_one_hot], dim=1))
             mu, log_var = torch.chunk(h, 2, dim=1)
             z = self.reparameterize(mu, log_var)
             z_h = torch.cat([z, h], dim=1)
@@ -278,7 +265,7 @@ class HVAE(VAE):
 
     def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
         """Concatenate the latent vectors with a one-hot encoding of y."""
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        y = F.one_hot(y, num_classes=self.num_classes + 1).float().to(self.device)
         z = torch.cat([zs[0], y], dim=1)
         return self.decoder_input(z)
 
@@ -295,7 +282,7 @@ class DCTHVAE(HVAE):
         self.ks = ks
         self.decoder_input = MLP(
             dims=[
-                3* self.latent_dim + self.num_classes + self.num_levels,
+                3 * self.latent_dim + self.num_classes + 1 + self.num_levels,
                 # self.num_hidden,
                 self.encoder_output_size,
             ]
@@ -309,9 +296,9 @@ class DCTHVAE(HVAE):
             x_dct = reconstruct_dct(x, k=k).to(self.device)
             outputs = self.forward(x_dct, y, level=level)
             outputs["x"] = x_dct
-            losses.append(self.loss_function(**outputs))
+            losses.append(self.loss_function(**outputs, reconstruction_scale=len(self.ks) - level))
             level_x_hat.append(outputs["x_hat"])
-        loss = {k: sum(loss[k] for loss in losses) for k in losses[0].keys()}
+        loss = {k: sum(loss[k] for loss in losses) / (len(self.ks) * (len(self.ks) + 1) / 2) for k in losses[0].keys()}
         return loss, level_x_hat
 
     def loss_function(
@@ -363,7 +350,7 @@ class DCTHVAE(HVAE):
         """Concatenate the latent vectors together and add a one-hot encoding of y."""
         # for i in range(level):
         #     zs[i] = torch.zeros_like(zs[i]).to(self.device)
-        y = F.one_hot(y, num_classes=self.num_classes).float().to(self.device)
+        y = F.one_hot(y, num_classes=self.num_classes + 1).float().to(self.device)
         lvl = F.one_hot(torch.tensor([level] * y.shape[0]), num_classes=self.num_levels).float().to(self.device)
         z = torch.cat([zs[0], y], dim=1)
         z = torch.cat([z, lvl], dim=1)
