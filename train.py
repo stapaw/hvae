@@ -80,7 +80,7 @@ def get_dataloaders(cfg: DictConfig):
     )
     train_dataset = CustomDataset(train_dataset, transform=transforms.Compose(
         [
-            transforms.RandomCrop(32, padding=1, padding_mode='edge'),
+            transforms.RandomCrop(32, padding=2, padding_mode='edge'),
             # transforms.RandomResizedCrop(32, scale=(0.9, 1.0)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
