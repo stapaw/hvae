@@ -25,50 +25,49 @@ class HVAE(VAE):
             [
                 MLP(
                     dims=[
-                        self.encoder_output_sizes[i],
+                        self.encoder_output_size,
                         # self.num_hidden,
-                        self.encoder_output_sizes[i] //4,
+                        self.encoder_output_size,
                     ],
                     # last_activation=nn.Sigmoid,
                 )
-                for i in range(self.num_levels)
+                for _ in range(self.num_levels)
             ]
         )
         self.delta_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
-                        self.encoder_output_sizes[i] // 4 + self.num_classes + 1,
+                        self.encoder_output_size + self.num_classes + 1,
                         # self.num_hidden,
                         2 * self.latent_dim,
                     ],
                     # activation=ModifiedSigmoid,
                 )
-                for i in range(self.num_levels)
+                for i in reversed(range(self.num_levels))
             ]
         )
 
-        self.h_net = MLP(dims=[2 * self.latent_dim + self.num_classes + 1,
-                               2 * self.latent_dim],
+        self.h_net = MLP(dims=[self.latent_dim + self.num_classes + 1,
+                               self.latent_dim],
                          )
 
         self.z_nets = nn.ModuleList(
             [
                 MLP(
                     dims=[
-                        3 * self.latent_dim + self.num_classes + 1,
+                        2 * (i) * self.latent_dim + self.num_classes + 1,
                         2 * self.latent_dim,
                     ],
                     # last_activation=ModifiedSigmoidZ
                 )
-                for _ in range(self.num_levels - 1)
+                for i in reversed(range(self.num_levels))
             ]
-            + [nn.Identity()]
         )
 
         self.decoder_input = MLP(
             dims=[
-                3 * self.latent_dim + num_classes + 1,
+                2 * (self.num_levels) * self.latent_dim + num_classes + 1,
                 # self.num_hidden,
                 self.encoder_output_size,
             ]
@@ -97,15 +96,15 @@ class HVAE(VAE):
         """
         assert level < self.num_levels, f"Invalid level: {level}."
 
-        # x = self.encoder(x).flatten(start_dim=1)
-        xs = []
-        for i in range(self.num_levels):
-            x = self.encoder.encoder[i:i + 1](x)#.flatten(start_dim=1)
-            xs.append(x)#.flatten(start_dim=1)
+        x = self.encoder(x).flatten(start_dim=1)
+        # xs = []
+        # for i in range(self.num_levels):
+        #     x = self.encoder.encoder[i:i + 1](x)#.flatten(start_dim=1)
+        #     xs.append(x)#.flatten(start_dim=1)
 
         rs = []
         for i, net in enumerate(self.r_nets):
-            x = net(xs[i].flatten(start_dim=1))
+            x = net(x)  # watch out - x changes
             rs.append(x)
 
         mask = torch.rand(y.shape) < no_label_prob
@@ -122,7 +121,6 @@ class HVAE(VAE):
         zs = []
         mu_log_vars = []
         previous_z = None
-        previous_h = None
         for (delta_mu, delta_log_var), net in zip(
                 reversed(mu_log_var_deltas), reversed(self.z_nets[level:])
         ):
@@ -131,26 +129,22 @@ class HVAE(VAE):
             if previous_z is None:
                 mu_log_vars.append((None, None))
                 z = self.reparameterize(delta_mu, delta_log_var)
-                h = self.h_net(
-                    torch.cat([torch.ones([z.shape[0], 2 * self.latent_dim]).to(self.device), y_one_hot], dim=1).to(
-                        self.device))
+                z = torch.cat([z, torch.zeros(x.shape[0], self.latent_dim).to(self.device)], dim=1)
+                previous_z = z
             else:
-                h = net(torch.cat([previous_z, previous_h, y_one_hot], dim=1))
-                assert torch.cat([previous_z, previous_h], dim=1).shape[1] == 3 * self.latent_dim
+                h = net(torch.cat([z, y_one_hot], dim=1))
                 mu, log_var = torch.chunk(h, 2, dim=1)
                 assert not torch.isnan(mu).any(), "mu is NaN"
                 assert not torch.isnan(log_var).any(), "log_var is NaN"
                 mu_log_vars.append((mu, log_var))
-                z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
+                previous_z = self.reparameterize(mu + delta_mu, log_var + delta_log_var)
+                z = torch.cat([z, previous_z, mu], dim=1)
             assert not torch.isnan(z).any(), "z is NaN"
-            previous_z = z
-            previous_h = h
-            z_h = torch.cat([z, h], dim=1)
-            assert z_h.shape[1] == 3 * self.latent_dim
-            zs.append(z_h)
+
+            zs.append(z)
         zs = list(reversed(zs))
         mu_log_vars = list(reversed(mu_log_vars))
-
+        zs[0] = torch.cat([zs[0], torch.zeros(x.shape[0], 2 * level * self.latent_dim).to(self.device)], dim=1)
         x_hat = self.decode(self.before_decoder(zs, y, level=level))
 
         return {
@@ -176,17 +170,17 @@ class HVAE(VAE):
         Returns:
             Dictionary containing the loss value and the individual losses
         """
-        delta_mu_max, delta_mu_min, delta_mu_mean = torch.max(mu_log_var_deltas[-1][0]), \
-                                                    torch.min(mu_log_var_deltas[-1][0]), torch.mean(
-            mu_log_var_deltas[-1][0])
-        delta_log_max, delta_log_min, delta_log_mean = torch.max(mu_log_var_deltas[-1][1]), torch.min(
-            mu_log_var_deltas[-1][1]), torch.mean(mu_log_var_deltas[-1][1])
-
-        mu_max, mu_min, mu_mean = torch.max(mu_log_vars[-2][0]), \
-                                  torch.min(mu_log_vars[-2][0]), torch.mean(
-            mu_log_vars[-2][0])
-        log_max, log_min, log_mean = torch.max(mu_log_vars[-2][1]), torch.min(
-            mu_log_vars[-2][1]), torch.mean(mu_log_vars[-2][1])
+        # delta_mu_max, delta_mu_min, delta_mu_mean = torch.max(mu_log_var_deltas[-1][0]), \
+        #                                             torch.min(mu_log_var_deltas[-1][0]), torch.mean(
+        #     mu_log_var_deltas[-1][0])
+        # delta_log_max, delta_log_min, delta_log_mean = torch.max(mu_log_var_deltas[-1][1]), torch.min(
+        #     mu_log_var_deltas[-1][1]), torch.mean(mu_log_var_deltas[-1][1])
+        #
+        # mu_max, mu_min, mu_mean = torch.max(mu_log_vars[-2][0]), \
+        #                           torch.min(mu_log_vars[-2][0]), torch.mean(
+        #     mu_log_vars[-2][0])
+        # log_max, log_min, log_mean = torch.max(mu_log_vars[-2][1]), torch.min(
+        #     mu_log_vars[-2][1]), torch.mean(mu_log_vars[-2][1])
 
         reconstruction_loss = F.mse_loss(x_hat, x, reduction="sum") / x.shape[0]
 
@@ -196,35 +190,37 @@ class HVAE(VAE):
         ):
             if mu is not None:
                 klds.append(
-                    0.5 * delta_mu ** 2 / torch.exp(log_var)
-                    + torch.exp(delta_log_var)
-                    - delta_log_var
-                    - 1
+                    (
+                        0.5 * delta_mu ** 2 / torch.exp(log_var)
+                        + torch.exp(delta_log_var)
+                        - delta_log_var
+                        - 1
+                    ).sum()
                 )
             else:
                 klds.append(
-                    0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1
+                    (0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1).sum()
                 )
-
-        kld = sum(klds).sum() / x.shape[0]
+        kld = sum(klds)
+        kld = kld / x.shape[0]
         loss = reconstruction_loss + self.beta * kld
 
         return {
             "loss": loss,
             "reconstruction_loss": reconstruction_loss,
             "kl_divergence": kld,
-            "delta_mu_max": delta_mu_max,
-            "delta_mu_min": delta_mu_min,
-            "delta_mu_mean": delta_mu_mean,
-            "delta_log_max": delta_log_max,
-            "delta_log_min": delta_log_min,
-            "delta_log_mean": delta_log_mean,
-            "mu_max": mu_max,
-            "mu_min": mu_min,
-            "mu_mean": mu_mean,
-            "log_max": log_max,
-            "log_min": log_min,
-            "log_mean": log_mean
+            # "delta_mu_max": delta_mu_max,
+            # "delta_mu_min": delta_mu_min,
+            # "delta_mu_mean": delta_mu_mean,
+            # "delta_log_max": delta_log_max,
+            # "delta_log_min": delta_log_min,
+            # "delta_log_mean": delta_log_mean,
+            # "mu_max": mu_max,
+            # "mu_min": mu_min,
+            # "mu_mean": mu_mean,
+            # "log_max": log_max,
+            # "log_min": log_min,
+            # "log_mean": log_mean
         }
 
     @torch.no_grad()
@@ -248,19 +244,19 @@ class HVAE(VAE):
             z = torch.randn(num_samples, self.latent_dim).to(self.device)
 
         y_one_hot = F.one_hot(y, num_classes=self.num_classes + 1).float().to(self.device)
-        h = self.h_net(torch.cat([torch.ones([z.shape[0], 2 * self.latent_dim]).to(self.device), y_one_hot], dim=1).to(
-            self.device))
-        z_h = torch.cat([z, h], dim=1)
-        zs = [z_h]
-
+        # h = self.h_net(torch.cat([torch.ones([z.shape[0], self.latent_dim]).to(self.device), y_one_hot], dim=1).to(
+        #     self.device))
+        # z_h = z + h
+        z = torch.cat([z, torch.zeros(num_samples, self.latent_dim).to(self.device)], dim=1)
+        zs = [z]
         for i, net in enumerate(reversed(self.z_nets[level:-1])):
-            h = net(torch.cat([z, h, y_one_hot], dim=1))
+            h = net(torch.cat([z, y_one_hot], dim=1))
             mu, log_var = torch.chunk(h, 2, dim=1)
-            z = self.reparameterize(mu, log_var)
-            z_h = torch.cat([z, h], dim=1)
-            zs.append(z_h)
+            previous_z = self.reparameterize(mu, log_var)
+            z = torch.cat([z, previous_z, mu], dim=1)
+            zs.append(z)
         zs = list(reversed(zs))
-
+        zs[0] = torch.cat([zs[0], torch.zeros(num_samples, 2* level*self.latent_dim).to(self.device)], dim=1)
         return self.decode(self.before_decoder(zs, y, level=level))
 
     def before_decoder(self, zs: list[Tensor], y: Tensor, level: int = 0):
@@ -282,7 +278,7 @@ class DCTHVAE(HVAE):
         self.ks = ks
         self.decoder_input = MLP(
             dims=[
-                3 * self.latent_dim + self.num_classes + 1 + self.num_levels,
+                2* self.latent_dim * self.num_levels + self.num_classes + 1 + self.num_levels,
                 # self.num_hidden,
                 self.encoder_output_size,
             ]
@@ -327,17 +323,19 @@ class DCTHVAE(HVAE):
         ):
             if mu is not None:
                 klds.append(
-                    0.5 * delta_mu ** 2 / torch.exp(log_var)
-                    + torch.exp(delta_log_var)
-                    - delta_log_var
-                    - 1
+                    (
+                            0.5 * delta_mu ** 2 / torch.exp(log_var)
+                            + torch.exp(delta_log_var)
+                            - delta_log_var
+                            - 1
+                    ).sum()
                 )
             else:
                 klds.append(
-                    0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1
+                    (0.5 * delta_mu ** 2 + torch.exp(delta_log_var) - delta_log_var - 1).sum()
                 )
-
-        kld = reconstruction_scale * sum(klds).sum() / x.shape[0]
+        kld = sum(klds)
+        kld = reconstruction_scale * kld / x.shape[0]
         loss = reconstruction_loss + self.beta * kld
 
         return {

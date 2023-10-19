@@ -41,6 +41,7 @@ def train(cfg: DictConfig) -> None:
     model = hydra.utils.instantiate(cfg.model)
     print_summary(cfg, model)
     trainer.fit(model, train_dataloader, val_dataloader)
+    torch.save(model, f"/home/spawlak/hvae/model_e500_l{cfg.model.latent_dim}.pt")
     # model = torch.load("/home/spawlak/hvae/pretrained_model_k8_l16.pt")
 
 
@@ -79,7 +80,8 @@ def get_dataloaders(cfg: DictConfig):
     )
     train_dataset = CustomDataset(train_dataset, transform=transforms.Compose(
         [
-            transforms.RandomCrop(32, padding=4),
+            transforms.RandomCrop(32, padding=1, padding_mode='edge'),
+            # transforms.RandomResizedCrop(32, scale=(0.9, 1.0)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(
